@@ -6,7 +6,7 @@ Alembic migrations, Redis cache, and PostgreSQL. Domain-driven layered architect
 
 ## Setup & Run
 ```bash
-poetry install            # install all dependencies
+make init            # install all dependencies
 make dev                  # start dev server (fastapi dev app/main.py)
 make test                 # lint + pytest + coverage report
 make lint                 # ruff check only
@@ -97,24 +97,56 @@ make test-file file=tests/app/domain/<domain>/test_service.py
 4. `make migrate` — apply migration
 5. Add tests for repository and service
 
-### Auth-related change
-- Token/hash/current user: `app/core/security/security.py`
-- Login/refresh flow: `app/domain/auth/*`
-- Tests: `tests/app/core/security/` and `tests/app/domain/auth/`
 
-### Cache-related change
-- Generic cache: `app/core/cache/`
-- Domain-specific cache: `app/domain/<domain>/cache.py`
-- Validate key/expiry with tests in `tests/app/core/cache/`
+# machado-api
+
+## Package Identity
+RESTful API Python 3.13, FastAPI async, SQLAlchemy, Pydantic v2, Alembic, Redis, PostgreSQL.
+
+## Setup & Run
+```bash
+poetry install
+make dev
+make test
+make lint
+make format
+make create-migration message="msg"
+make migrate
+```
+
+## Patterns & Conventions
+- 5 camadas: `route.py` → `service.py` → `repository.py` → `models.py`/`business.py`/`schema.py`
+- Nunca coloque lógica de negócio em `route.py`
+- Use `BaseService`/`BaseRepository` para CRUD
+- Use cache via `CacheService` quando aplicável
+- Testes espelham estrutura do código
+
+## Key Files
+- Entry: `app/main.py`
+- Settings: `app/core/settings.py`
+- Auth: `app/core/security/security.py`
+- Cache: `app/core/cache/service.py`
+- Base service: `app/core/service/base.py`
+- Base repo: `app/core/repository/base.py`
+- Shared schemas: `app/shared/schemas.py`
+
+## JIT Index Hints
+```bash
+rg -n "@router\\.(get|post|put|delete|patch)" app/domain/
+find app/models -name "*.py" ! -name "__init__.py"
+```
+
+## Common Gotchas
+- Nunca altere migrations já aplicadas
+- Sempre use variáveis de ambiente para configs sensíveis
+- Testes devem cobrir todos os fluxos alterados
 
 ## Pre-PR Checklist
 ```bash
-make test   # lint + pytest + coverage — must be green
+make lint && make test
 ```
-- [ ] Change made in the correct layer
-- [ ] No HTTP contract broken without updating schema/test/docs
-- [ ] Errors handled via `handle_service_exception` / appropriate `HTTPException`
-- [ ] Relevant logs added with context
-- [ ] Tests for the modified module updated and passing
-- [ ] Ruff (`make lint`) clean
-- [ ] If DB changed, migration created and reviewed
+- [ ] Mudança na camada correta
+- [ ] Contrato HTTP e schemas/testes atualizados
+- [ ] Logs/contexto adicionados
+- [ ] Testes verdes
+- [ ] Migration criada/revisada se DB mudou
