@@ -188,7 +188,7 @@ Or, if you prefer, follow the manual steps below:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/machado-api.git
+   git clone https://github.com/jorgevmachado/machado-api.git
    cd machado-api
    ```
 2. Install dependencies and activate the environment:
@@ -265,7 +265,7 @@ ruff format .
 - [] Automated tests
 - [] Lint and format
 
-See the [open issues](https://github.com/yourusername/machado-api/issues) for the full list of proposed features and known issues.
+See the [open issues](https://github.com/jorgevmachado/machado-api/issues) for the full list of proposed features and known issues.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -305,7 +305,7 @@ See the [LICENSE](./LICENSE) file for details.
 
 Jorge Machado - jorge.vmachado@gmail.com
 
-Project Link: [https://github.com/yourusername/machado-api](https://github.com/yourusername/machado-api)
+Project Link: [https://github.com/jorgevmachado/machado-api](https://github.com/jorgevmachado/machado-api)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -323,7 +323,7 @@ Use this space to list resources you find helpful and would like to give credit 
 
 <!-- MARKDOWN LINKS & IMAGES -->
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/yourusername
+[linkedin-url]: https://linkedin.com/in/jorgevmachado
 
 [Poetry]: https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json
 [Poetry-url]: https://python-poetry.org/
@@ -347,11 +347,11 @@ Use this space to list resources you find helpful and would like to give credit 
 [psycopg-url]: https://www.psycopg.org/psycopg3/docs/
 [tzdata]: https://img.shields.io/badge/tzdata-0A192F?logo=clockify&logoColor=white
 [tzdata-url]: https://pypi.org/project/tzdata/
-[githubStar-url]: https://github.com/yourusername/machado-api/stargazers
-[githubStar-img]: https://img.shields.io/github/stars/yourusername/machado-api?style=for-the-badge
-[githubForks-url]: https://github.com/yourusername/machado-api/network
-[githubForks-img]: https://img.shields.io/github/forks/yourusername/machado-api?style=for-the-badge
-[githubIssues-url]: https://github.com/yourusername/machado-api/issues
-[githubIssues-img]: https://img.shields.io/github/issues/yourusername/machado-api?style=for-the-badge
+[githubStar-url]: https://github.com/jorgevmachado/machado-api/stargazers
+[githubStar-img]: https://img.shields.io/github/stars/jorgevmachado/machado-api?style=for-the-badge
+[githubForks-url]: https://github.com/jorgevmachado/machado-api/network
+[githubForks-img]: https://img.shields.io/github/forks/jorgevmachado/machado-api?style=for-the-badge
+[githubIssues-url]: https://github.com/jorgevmachado/machado-api/issues
+[githubIssues-img]: https://img.shields.io/github/issues/jorgevmachado/machado-api?style=for-the-badge
 [githubLicense-url]: ./LICENSE
-[githubLicense-img]: https://img.shields.io/github/license/yourusername/machado-api?style=for-the-badge
+[githubLicense-img]: https://img.shields.io/github/license/jorgevmachado/machado-api?style=for-the-badge
