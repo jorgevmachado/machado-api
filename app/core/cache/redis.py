@@ -5,10 +5,10 @@ from app.core.settings import Settings
 settings = Settings()
 
 redis_connection_kwargs = {
-    'decode_responses': True,
-    'socket_timeout': 1,
-    'socket_connect_timeout': 1,
-    'health_check_interval': 30,
+    "decode_responses": True,
+    "socket_timeout": 1,
+    "socket_connect_timeout": 1,
+    "health_check_interval": 30,
 }
 
 redis_client = (

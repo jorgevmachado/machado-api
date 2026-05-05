@@ -38,8 +38,8 @@ def exception_pagination(page_filter: Annotated[FilterPage, Query()] = None):
         handle_service_exception(
             logger=logger,
             exception=exception,
-            service='exception_pagination',
-            operation='exception_pagination',
+            service="exception_pagination",
+            operation="exception_pagination",
             raise_exception=False,
         )
         return []

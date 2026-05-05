@@ -5,11 +5,12 @@ Revises:
 Create Date: 2026-04-22 16:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = 'a1b2c3d4e5f6'
+revision: str = "a1b2c3d4e5f6"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,7 +26,7 @@ def upgrade() -> None:
             """)
     op.execute("""
                   DO $$ BEGIN
-                      CREATE TYPE statusenum AS ENUM ('ACTIVE','INACTIVE');
+                      CREATE TYPE statusenum AS ENUM ('ACTIVE','INACTIVE','INCOMPLETE');
                   EXCEPTION
                       WHEN duplicate_object THEN null;
                   END $$;
@@ -65,4 +66,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table('users')
+    op.drop_table("users")

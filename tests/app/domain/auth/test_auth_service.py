@@ -18,12 +18,12 @@ from app.models.enums import GenderEnum, StatusEnum, RoleEnum
 
 def build_register_schema() -> RegisterSchema:
     return RegisterSchema(
-        name='Ash Ketchum',
-        email='ash@example.com',
-        username='ash',
+        name="Ash Ketchum",
+        email="ash@example.com",
+        username="ash",
         gender=GenderEnum.MALE,
         date_of_birth=datetime(1990, 1, 1, tzinfo=timezone.utc),
-        password='pikachu123',
+        password="pikachu123",
     )
 
 
@@ -31,12 +31,12 @@ class TestAuthSchema:
     def test_register_schema_rejects_short_password(self):
         with pytest.raises(ValidationError):
             RegisterSchema(
-                name='Ash',
-                email='ash@example.com',
-                username='ash',
+                name="Ash",
+                email="ash@example.com",
+                username="ash",
                 gender=GenderEnum.MALE,
                 date_of_birth=datetime(1990, 1, 1, tzinfo=timezone.utc),
-                password='short',
+                password="short",
             )
 
 
@@ -47,9 +47,9 @@ class TestUserRepository:
         session = AsyncMock()
         repository = UserRepository(session=session)
 
-        await repository.get_by_email('ash@example.com')
-        await repository.get_by_username('ash')
-        await repository.get_by_email_or_username('ash')
+        await repository.get_by_email("ash@example.com")
+        await repository.get_by_username("ash")
+        await repository.get_by_email_or_username("ash")
 
         assert session.scalar.await_count == 3
 
@@ -62,7 +62,7 @@ class TestUserRepository:
         repository.save = AsyncMock(return_value=expected)
 
         result = await repository.create(
-            build_register_schema().model_dump() | {'status': StatusEnum.INCOMPLETE}
+            build_register_schema().model_dump() | {"status": StatusEnum.INCOMPLETE}
         )
 
         assert result is expected
@@ -96,7 +96,7 @@ class TestAuthService:
             await service.register(build_register_schema())
 
         assert exc_info.value.status_code == HTTPStatus.CONFLICT
-        assert exc_info.value.detail == 'Email already registered'
+        assert exc_info.value.detail == "Email already registered"
 
     @staticmethod
     @pytest.mark.asyncio
@@ -110,7 +110,7 @@ class TestAuthService:
             await service.register(build_register_schema())
 
         assert exc_info.value.status_code == HTTPStatus.CONFLICT
-        assert exc_info.value.detail == 'Username already taken'
+        assert exc_info.value.detail == "Username already taken"
 
     @staticmethod
     @pytest.mark.asyncio
@@ -120,7 +120,9 @@ class TestAuthService:
         repository.get_by_username.return_value = None
         created = SimpleNamespace(id=uuid4())
         repository.create.return_value = created
-        monkeypatch.setattr('app.domain.auth.service.get_password_hash', lambda _: 'hashed-password')
+        monkeypatch.setattr(
+            "app.domain.auth.service.get_password_hash", lambda _: "hashed-password"
+        )
         service = AuthService(repository=repository, trainer_repository=AsyncMock())
 
         result = await service.register(build_register_schema())
@@ -128,8 +130,8 @@ class TestAuthService:
         assert result is created
         repository.create.assert_awaited_once()
         payload = repository.create.await_args.args[0]
-        assert payload['password'] == 'hashed-password'
-        assert payload['status'] == StatusEnum.ACTIVE
+        assert payload["password"] == "hashed-password"
+        assert payload["status"] == StatusEnum.ACTIVE
 
     @staticmethod
     @pytest.mark.asyncio
@@ -139,22 +141,22 @@ class TestAuthService:
         service = AuthService(repository=repository, trainer_repository=AsyncMock())
 
         with pytest.raises(HTTPException) as exc_info:
-            await service.login(LoginSchema(credential='ash', password='pikachu123'))
+            await service.login(LoginSchema(credential="ash", password="pikachu123"))
 
         assert exc_info.value.status_code == HTTPStatus.UNAUTHORIZED
-        assert exc_info.value.detail == 'Invalid credentials'
+        assert exc_info.value.detail == "Invalid credentials"
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_login_rejects_invalid_password(monkeypatch):
-        user = SimpleNamespace(id=uuid4(), password='hashed')
+        user = SimpleNamespace(id=uuid4(), password="hashed")
         repository = AsyncMock()
         repository.get_by_email_or_username.return_value = user
-        monkeypatch.setattr('app.domain.auth.service.verify_password', lambda *_: False)
+        monkeypatch.setattr("app.domain.auth.service.verify_password", lambda *_: False)
         service = AuthService(repository=repository, trainer_repository=AsyncMock())
 
         with pytest.raises(HTTPException) as exc_info:
-            await service.login(LoginSchema(credential='ash', password='bad-password'))
+            await service.login(LoginSchema(credential="ash", password="bad-password"))
 
         assert exc_info.value.status_code == HTTPStatus.UNAUTHORIZED
         repository.update_auth_failure.assert_awaited_once_with(user.id)
@@ -162,39 +164,43 @@ class TestAuthService:
     @staticmethod
     @pytest.mark.asyncio
     async def test_login_returns_token_for_valid_user(monkeypatch):
-        user = SimpleNamespace(id=uuid4(), password='hashed')
+        user = SimpleNamespace(id=uuid4(), password="hashed")
         repository = AsyncMock()
         repository.get_by_email_or_username.return_value = user
-        monkeypatch.setattr('app.domain.auth.service.verify_password', lambda *_: True)
+        monkeypatch.setattr("app.domain.auth.service.verify_password", lambda *_: True)
         monkeypatch.setattr(
-            'app.domain.auth.service.create_access_token',
+            "app.domain.auth.service.create_access_token",
             lambda payload: f"token-{payload['sub']}",
         )
         service = AuthService(repository=repository, trainer_repository=AsyncMock())
 
-        result = await service.login(LoginSchema(credential='ash', password='pikachu123'))
+        result = await service.login(
+            LoginSchema(credential="ash", password="pikachu123")
+        )
 
-        assert result.access_token == f'token-{user.id}'
-        assert result.token_type == 'bearer'
+        assert result.access_token == f"token-{user.id}"
+        assert result.token_type == "bearer"
         repository.update_auth_success.assert_awaited_once_with(user.id)
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_me_loads_through_repository():
-        user_id = uuid4()        
+        user_id = uuid4()
         current_user = SimpleNamespace(
             id=user_id,
-            name='Ash',
-            email='ash@example.com',            
-            username='ash',
+            name="Ash",
+            email="ash@example.com",
+            username="ash",
             role=RoleEnum.USER,
             status=StatusEnum.ACTIVE,
             created_at=datetime.now(timezone.utc),
         )
-        trainer_repository = AsyncMock()    
-        service = AuthService(repository=AsyncMock(), trainer_repository=trainer_repository)
+        trainer_repository = AsyncMock()
+        service = AuthService(
+            repository=AsyncMock(), trainer_repository=trainer_repository
+        )
 
         result = await service.me(current_user)
 
         trainer_repository.get_by_user_id.assert_awaited_once_with(user_id)
-        assert result.id == user_id        
+        assert result.id == user_id

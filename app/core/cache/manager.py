@@ -26,7 +26,7 @@ class CacheManager:
                     continue
 
                 sorted_items = sorted(clean.items())
-                query_string = '&'.join(f'{k}={v}' for k, v in sorted_items)
+                query_string = "&".join(f"{k}={v}" for k, v in sorted_items)
 
                 normalized_parts.append(query_string)
                 continue
@@ -39,7 +39,7 @@ class CacheManager:
         if not normalized_parts:
             return prefix
 
-        return f'{prefix}:{":".join(normalized_parts)}'
+        return f"{prefix}:{':'.join(normalized_parts)}"
 
     async def get_cache(self, key: str) -> Optional[dict]:
         value = await self.redis_client.get(key)
@@ -49,3 +49,10 @@ class CacheManager:
 
     async def set_cache(self, key: str, value: Any, ttl: int = 300):
         await self.redis_client.setex(key, ttl, json.dumps(value))
+
+    async def delete_cache(self, key: str):
+        await self.redis_client.delete(key)
+
+    async def delete_pattern(self, pattern: str):
+        async for key in self.redis_client.scan_iter(match=pattern):
+            await self.redis_client.delete(key)

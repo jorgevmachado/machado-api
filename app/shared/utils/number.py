@@ -15,7 +15,7 @@ ALLOWED_OPERATORS = {
 def ensure_order_number(url: str | None) -> int:
     if not url:
         return 0
-    return int(url.split('/')[-2])
+    return int(url.split("/")[-2])
 
 
 def convert_latex_to_python(formula: str) -> str:
@@ -31,32 +31,34 @@ def convert_latex_to_python(formula: str) -> str:
     - (5x^3) / 4 -> (5 * x**3) / 4
     """
     # 1. Converter \frac{numerador}{denominador} para (numerador) / (denominador)
-    while r'\frac' in formula:
-        formula = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'(\1) / (\2)', formula, count=1)
+    while r"\frac" in formula:
+        formula = re.sub(
+            r"\\frac\{([^}]+)\}\{([^}]+)\}", r"(\1) / (\2)", formula, count=1
+        )
 
     # 2. Converter nx^m (número seguido de x com potência) para n * x^m
     # Deve ser feito ANTES de converter x^n para x**n
-    formula = re.sub(r'(?<![*\w])(\d+)x\^', r'\1 * x^', formula)
+    formula = re.sub(r"(?<![*\w])(\d+)x\^", r"\1 * x^", formula)
 
     # 3. Converter x^n para x**n (potências)
-    formula = re.sub(r'x\^(\d+)', r'x**\1', formula)
+    formula = re.sub(r"x\^(\d+)", r"x**\1", formula)
 
     # 4. Converter nx (número seguido de x SEM potência) para n * x
     # Isso pega casos como "12x" mas não "12x**2" (que já foi convertido)
-    formula = re.sub(r'(?<![*\w])(\d+)x(?![*\w])', r'\1 * x', formula)
+    formula = re.sub(r"(?<![*\w])(\d+)x(?![*\w])", r"\1 * x", formula)
 
     # 5. Converter expressões com parênteses tipo (5x -> (5 * x
-    formula = re.sub(r'\((\d+)x', r'(\1 * x', formula)
+    formula = re.sub(r"\((\d+)x", r"(\1 * x", formula)
 
     # 6. Converter )x para ) * x (parêntese fechando seguido de x)
-    formula = re.sub(r'\)(\d*x)', r') * \1', formula)
+    formula = re.sub(r"\)(\d*x)", r") * \1", formula)
 
     return formula
 
 
 def calculate_by_formula(formula: str, x: float) -> float:
     python_formula = convert_latex_to_python(formula)
-    node = ast.parse(python_formula, mode='eval')
+    node = ast.parse(python_formula, mode="eval")
     return eval(node.body, x)
 
 
@@ -65,9 +67,9 @@ def eval(node: ast.expr, x: float) -> float:
         return node.n
 
     if isinstance(node, ast.Name):  # variable (x)
-        if node.id == 'x':
+        if node.id == "x":
             return x
-        raise ValueError('Invalid variable')
+        raise ValueError("Invalid variable")
 
     if isinstance(node, ast.BinOp):
         operator = ALLOWED_OPERATORS[type(node.op)]
@@ -77,4 +79,4 @@ def eval(node: ast.expr, x: float) -> float:
         operator = ALLOWED_OPERATORS[type(node.op)]
         return operator(eval(node.operand, x))
 
-    raise TypeError('Unsupported expression')
+    raise TypeError("Unsupported expression")

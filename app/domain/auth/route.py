@@ -26,7 +26,9 @@ def get_auth_service(session: Session) -> AuthService:
     return AuthService(UserRepository(session))
 
 
-@router.post('/register', response_model=RegisterResponseSchema, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/register", response_model=RegisterResponseSchema, status_code=HTTPStatus.CREATED
+)
 async def register(
     data: RegisterSchema,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -35,7 +37,7 @@ async def register(
     return user
 
 
-@router.post('/login', response_model=LoginResponseSchema, status_code=HTTPStatus.OK)
+@router.post("/login", response_model=LoginResponseSchema, status_code=HTTPStatus.OK)
 async def login(
     data: LoginSchema,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -43,7 +45,7 @@ async def login(
     return await service.login(data)
 
 
-@router.get('/me', response_model=AuthResponseSchema, status_code=HTTPStatus.OK)
+@router.get("/me", response_model=AuthResponseSchema, status_code=HTTPStatus.OK)
 async def me(
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[AuthService, Depends(get_auth_service)],

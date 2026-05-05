@@ -22,12 +22,16 @@ class UserRepository(BaseRepository[User]):
         return result
 
     async def get_by_username(self, username: str) -> User | None:
-        result = await self.session.scalar(select(User).where(User.username == username))
+        result = await self.session.scalar(
+            select(User).where(User.username == username)
+        )
         return result
 
     async def get_by_email_or_username(self, credential: str) -> User | None:
         result = await self.session.scalar(
-            select(User).where(or_(User.email == credential, User.username == credential))
+            select(User).where(
+                or_(User.email == credential, User.username == credential)
+            )
         )
         return result
 
@@ -73,8 +77,6 @@ class UserRepository(BaseRepository[User]):
 
     async def soft_delete(self, user_id: UUID) -> None:
         await self.session.execute(
-            sa_update(User)
-            .where(User.id == user_id)
-            .values(deleted_at=_utcnow())
+            sa_update(User).where(User.id == user_id).values(deleted_at=_utcnow())
         )
         await self.session.commit()

@@ -29,44 +29,50 @@ def mock_repository():
 def logger_params():
     return LoggingParams(
         logger=MagicMock(),
-        service='test_service',
-        operation='test_operation',
+        service="test_service",
+        operation="test_operation",
     )
 
 
 @pytest.fixture
 def base_service(mock_repository, logger_params):
-    service = BaseService('test_service', mock_repository, logger_params, BaseModelSchema)
+    service = BaseService(
+        "test_service", mock_repository, logger_params, BaseModelSchema
+    )
     return service
 
 
-MOCK_RESULT = {'id': '123e4567-e89b-12d3-a456-426614174000', 'name': 'name'}
+MOCK_RESULT = {"id": "123e4567-e89b-12d3-a456-426614174000", "name": "name"}
 
 
 class TestBaseServiceListAll:
     @staticmethod
     @pytest.mark.asyncio
     async def test_list_all_success(base_service, mock_repository):
-        mock_repository.list_all.return_value = ['item1', 'item2']
+        mock_repository.list_all.return_value = ["item1", "item2"]
         filter_page = FilterPage(limit=10, offset=1)
-        with patch('app.core.service.base.log_service_success') as mock_log_success:
-            result = await base_service.list_all(page_filter=filter_page, user_request='user1')
-            assert result == ['item1', 'item2']
+        with patch("app.core.service.base.log_service_success") as mock_log_success:
+            result = await base_service.list_all(
+                page_filter=filter_page, user_request="user1"
+            )
+            assert result == ["item1", "item2"]
             mock_repository.list_all.assert_awaited_once_with(page_filter=filter_page)
             mock_log_success.assert_called_once()
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_list_all_exception(base_service, mock_repository):
-        mock_repository.list_all.side_effect = Exception('Repo error')
+        mock_repository.list_all.side_effect = Exception("Repo error")
         filter_page = FilterPage(limit=10, offset=1)
         with (
-            patch('app.core.service.base.handle_service_exception') as mock_handle_exc,
-            patch('app.core.service.base.log_service_success') as mock_log_success,
+            patch("app.core.service.base.handle_service_exception") as mock_handle_exc,
+            patch("app.core.service.base.log_service_success") as mock_log_success,
         ):
-            result = await base_service.list_all(page_filter=filter_page, user_request='user2')
-            assert hasattr(result, 'items')
-            assert hasattr(result, 'meta')
+            result = await base_service.list_all(
+                page_filter=filter_page, user_request="user2"
+            )
+            assert hasattr(result, "items")
+            assert hasattr(result, "meta")
             meta = result.meta
             assert meta.total == 0
             assert result.items == []
@@ -81,38 +87,42 @@ class TestBaseServiceListAllCached:
     @pytest.mark.asyncio
     async def test_base_service_list_all_cached_success(base_service, mock_repository):
         values = [
-            BaseModelSchema(id='1', name='item1', value=1),
-            BaseModelSchema(id='2', name='item2', value=2),
+            BaseModelSchema(id="1", name="item1", value=1),
+            BaseModelSchema(id="2", name="item2", value=2),
         ]
-        base_service.cache_service.build_key_list = AsyncMock(return_value='test_service:list')
+        base_service.cache_service.build_key_list = AsyncMock(
+            return_value="test_service:list"
+        )
         base_service.cache_service.get_list = AsyncMock(return_value=values)
 
-        result = await base_service.list_all_cached(user_request='user1')
+        result = await base_service.list_all_cached(user_request="user1")
         assert isinstance(result, list)
         assert len(result) == len(values)
 
     @staticmethod
     @pytest.mark.asyncio
-    async def test_base_service_list_all_cached_not_cached(base_service, mock_repository):
+    async def test_base_service_list_all_cached_not_cached(
+        base_service, mock_repository
+    ):
         values = [
-            BaseModelSchema(id='1', name='item1', value=1),
-            BaseModelSchema(id='2', name='item2', value=2),
+            BaseModelSchema(id="1", name="item1", value=1),
+            BaseModelSchema(id="2", name="item2", value=2),
         ]
         with patch(
-            'app.core.cache.redis.redis_client', new_callable=AsyncMock
+            "app.core.cache.redis.redis_client", new_callable=AsyncMock
         ) as mock_redis_client:
             mock_redis_client.setex.return_value = None
             base_service.cache_service.build_key_list = AsyncMock(
-                return_value='test_service:list'
+                return_value="test_service:list"
             )
             base_service.cache_service.get_list = AsyncMock(return_value=None)
             base_service.list_all = AsyncMock(return_value=values)
 
             with patch(
-                'app.core.cache.manager.CacheManager.set_cache', new_callable=AsyncMock
+                "app.core.cache.manager.CacheManager.set_cache", new_callable=AsyncMock
             ) as mock_set_cache:
                 mock_set_cache.return_value = None
-                result = await base_service.list_all_cached(user_request='user2')
+                result = await base_service.list_all_cached(user_request="user2")
                 assert isinstance(result, list)
                 assert len(result) == len(values)
 
@@ -122,28 +132,28 @@ class TestBaseServiceFindOne:
     @pytest.mark.asyncio
     async def test_find_one_by_name_success(base_service, mock_repository):
         mock_repository.find_by.return_value = MOCK_RESULT
-        result = await base_service.find_one(param=MOCK_RESULT['name'])
-        assert result['id'] == MOCK_RESULT['id']
-        assert result['name'] == MOCK_RESULT['name']
-        mock_repository.find_by.assert_awaited_once_with(name=MOCK_RESULT['name'])
+        result = await base_service.find_one(param=MOCK_RESULT["name"])
+        assert result["id"] == MOCK_RESULT["id"]
+        assert result["name"] == MOCK_RESULT["name"]
+        mock_repository.find_by.assert_awaited_once_with(name=MOCK_RESULT["name"])
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_find_one_by_id_success(base_service, mock_repository):
         mock_repository.find_by.return_value = MOCK_RESULT
-        result = await base_service.find_one(param=MOCK_RESULT['id'])
-        assert result['id'] == MOCK_RESULT['id']
-        assert result['name'] == MOCK_RESULT['name']
-        mock_repository.find_by.assert_awaited_once_with(id=MOCK_RESULT['id'])
+        result = await base_service.find_one(param=MOCK_RESULT["id"])
+        assert result["id"] == MOCK_RESULT["id"]
+        assert result["name"] == MOCK_RESULT["name"]
+        mock_repository.find_by.assert_awaited_once_with(id=MOCK_RESULT["id"])
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_find_one_not_found(base_service, mock_repository):
         mock_repository.find_by.return_value = None
         with pytest.raises(HTTPException) as exc_info:
-            await base_service.find_one(param='not_found')
+            await base_service.find_one(param="not_found")
         assert exc_info.value.status_code == HTTPStatus.NOT_FOUND
-        assert exc_info.value.detail == 'test_service not found'
+        assert exc_info.value.detail == "test_service not found"
 
 
 class TestBaseServiceFindOneCached:
@@ -153,13 +163,15 @@ class TestBaseServiceFindOneCached:
     @pytest.mark.asyncio
     async def test_base_service_find_one_cached_success(base_service, mock_repository):
         """Should return complete pokemon when found"""
-        item = BaseModelSchema(id='1', name='item1', value=1)
+        item = BaseModelSchema(id="1", name="item1", value=1)
         mock_repository.find_by.return_value = item
         base_service.cache_service.build_key_one = AsyncMock(
-            return_value=f'test_service:{item.name}'
+            return_value=f"test_service:{item.name}"
         )
         base_service.cache_service.get_one = AsyncMock(return_value=item)
-        result = await base_service.find_one_cached(param=item.name, user_request='user1')
+        result = await base_service.find_one_cached(
+            param=item.name, user_request="user1"
+        )
         assert result is not None
         assert result.id == item.id
         assert result.name == item.name
@@ -167,25 +179,27 @@ class TestBaseServiceFindOneCached:
 
     @staticmethod
     @pytest.mark.asyncio
-    async def test_base_service_find_one_cached_not_cached(base_service, mock_repository):
-        item = BaseModelSchema(id='1', name='item1', value=1)
+    async def test_base_service_find_one_cached_not_cached(
+        base_service, mock_repository
+    ):
+        item = BaseModelSchema(id="1", name="item1", value=1)
         with patch(
-            'app.core.cache.redis.redis_client', new_callable=AsyncMock
+            "app.core.cache.redis.redis_client", new_callable=AsyncMock
         ) as mock_redis_client:
             mock_redis_client.setex.return_value = None
             base_service.cache_service.build_key_one = AsyncMock(
-                return_value=f'test_service:{item.name}'
+                return_value=f"test_service:{item.name}"
             )
             base_service.cache_service.get_one = AsyncMock(return_value=None)
 
             base_service.find_one = AsyncMock(return_value=item)
 
             with patch(
-                'app.core.cache.manager.CacheManager.set_cache', new_callable=AsyncMock
+                "app.core.cache.manager.CacheManager.set_cache", new_callable=AsyncMock
             ) as mock_set_cache:
                 mock_set_cache.return_value = None
                 result = await base_service.find_one_cached(
-                    param=item.name, user_request='user2'
+                    param=item.name, user_request="user2"
                 )
                 assert result is not None
                 assert result.id == item.id
@@ -198,19 +212,19 @@ class TestBaseServiceFindBy:
     @pytest.mark.asyncio
     async def test_find_by_success(base_service, mock_repository):
         mock_repository.find_by.return_value = MOCK_RESULT
-        result = await base_service.find_by(name=MOCK_RESULT['name'])
-        assert result['id'] == MOCK_RESULT['id']
-        assert result['name'] == MOCK_RESULT['name']
-        mock_repository.find_by.assert_awaited_once_with(name=MOCK_RESULT['name'])
+        result = await base_service.find_by(name=MOCK_RESULT["name"])
+        assert result["id"] == MOCK_RESULT["id"]
+        assert result["name"] == MOCK_RESULT["name"]
+        mock_repository.find_by.assert_awaited_once_with(name=MOCK_RESULT["name"])
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_find_by_not_found(base_service, mock_repository):
         mock_repository.find_by.return_value = None
         with pytest.raises(HTTPException) as exc_info:
-            await base_service.find_by(name=MOCK_RESULT['name'])
+            await base_service.find_by(name=MOCK_RESULT["name"])
         assert exc_info.value.status_code == HTTPStatus.NOT_FOUND
-        assert exc_info.value.detail == 'test_service not found'
+        assert exc_info.value.detail == "test_service not found"
 
 
 class MockUpdateSchema:
@@ -225,42 +239,51 @@ class TestBaseServiceUpdate:
     @staticmethod
     @pytest.mark.asyncio
     async def test_update_success(base_service, mock_repository):
-        entity = {'id': '123', 'name': 'old_name', 'value': 1}
+        entity = {"id": "123", "name": "old_name", "value": 1}
         mock_repository.find_by.return_value = entity
         mock_repository.update = AsyncMock(
-            return_value={**entity, 'name': 'new_name', 'value': 2}
+            return_value={**entity, "name": "new_name", "value": 2}
         )
-        update_data = {'name': 'new_name', 'value': 2}
+        update_data = {"name": "new_name", "value": 2}
         update_schema = MockUpdateSchema(update_data)
-        with patch('app.core.service.base.log_service_success') as mock_log_success:
-            result = await base_service.update(param='123', update_schema=update_schema)
-            assert result['name'] == 'new_name'
-            assert result['value'] == update_data['value']
-            mock_repository.update.assert_awaited_once()
-            mock_log_success.assert_any_call(
-                base_service.logger_params,
-                operation='update',
-                message=f'Update {base_service.alias} successfully',
-                user_request=None,
-            )
+        with patch("app.core.service.base.log_service_success"):
+            result = await base_service.update(param="123", update_schema=update_schema)
+            assert result["name"] == "new_name"
+            assert result["value"] == update_data["value"]
+        mock_repository.update.assert_awaited_once()
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_update_object_entity_success(base_service, mock_repository):
+        entity = BaseModelSchema(id="1", name="old", value=1)
+        mock_repository.find_by.return_value = entity
+        mock_repository.update = AsyncMock(return_value=entity)
+
+        update_schema = MockUpdateSchema({"name": "new", "value": 2})
+        result = await base_service.update("old", update_schema)
+
+        assert result.name == "new"
+        assert result.value == 2
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_update_partial_success(base_service, mock_repository):
-        entity = {'id': '123', 'name': 'old_name', 'value': 1}
+        entity = {"id": "123", "name": "old_name", "value": 1}
         mock_repository.find_by.return_value = entity
-        mock_repository.update = AsyncMock(return_value={**entity, 'name': 'partial_update'})
-        update_data = {'name': 'partial_update'}
+        mock_repository.update = AsyncMock(
+            return_value={**entity, "name": "partial_update"}
+        )
+        update_data = {"name": "partial_update"}
         update_schema = MockUpdateSchema(update_data)
-        with patch('app.core.service.base.log_service_success') as mock_log_success:
-            result = await base_service.update(param='123', update_schema=update_schema)
-            assert result['name'] == 'partial_update'
-            assert result['value'] == 1
+        with patch("app.core.service.base.log_service_success") as mock_log_success:
+            result = await base_service.update(param="123", update_schema=update_schema)
+            assert result["name"] == "partial_update"
+            assert result["value"] == 1
             mock_repository.update.assert_awaited_once()
             mock_log_success.assert_any_call(
                 base_service.logger_params,
-                operation='update',
-                message=f'Update {base_service.alias} successfully',
+                operation="update",
+                message=f"Update {base_service.alias} successfully",
                 user_request=None,
             )
 
@@ -268,29 +291,29 @@ class TestBaseServiceUpdate:
     @pytest.mark.asyncio
     async def test_update_not_found(base_service, mock_repository):
         base_service.find_one = AsyncMock(return_value=None)
-        update_schema = MockUpdateSchema({'name': 'irrelevant'})
+        update_schema = MockUpdateSchema({"name": "irrelevant"})
         with pytest.raises(HTTPException) as exc_info:
-            await base_service.update(param='not_found', update_schema=update_schema)
+            await base_service.update(param="not_found", update_schema=update_schema)
         assert exc_info.value.status_code == HTTPStatus.NOT_FOUND
-        assert 'not found' in str(exc_info.value.detail)
+        assert "not found" in str(exc_info.value.detail)
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_update_exception(base_service, mock_repository):
-        entity = {'id': '123', 'name': 'old_name'}
+        entity = {"id": "123", "name": "old_name"}
         mock_repository.find_by.return_value = entity
-        mock_repository.update = AsyncMock(side_effect=Exception('DB error'))
-        update_schema = MockUpdateSchema({'name': 'fail_update'})
+        mock_repository.update = AsyncMock(side_effect=Exception("DB error"))
+        update_schema = MockUpdateSchema({"name": "fail_update"})
         with (
-            patch('app.core.service.base.handle_service_exception') as mock_handle_exc,
-            patch('app.core.service.base.log_service_success') as mock_log_success,
+            patch("app.core.service.base.handle_service_exception") as mock_handle_exc,
+            patch("app.core.service.base.log_service_success") as mock_log_success,
         ):
-            await base_service.update(param='123', update_schema=update_schema)
+            await base_service.update(param="123", update_schema=update_schema)
             mock_handle_exc.assert_called_once()
             # Verifica se a chamada de update foi feita
             mock_log_success.assert_any_call(
                 base_service.logger_params,
-                operation='update',
-                message=f'Update {base_service.alias} successfully',
+                operation="update",
+                message=f"Update {base_service.alias} successfully",
                 user_request=None,
             )

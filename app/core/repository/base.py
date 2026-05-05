@@ -10,7 +10,7 @@ from app.core.pagination import CustomLimitOffsetPage, is_paginate
 from app.core.pagination.pagination import get_limit_offset_params
 from app.shared.schemas import FilterPage
 
-ModelT = TypeVar('ModelT')
+ModelT = TypeVar("ModelT")
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
@@ -22,8 +22,10 @@ class BaseRepository(Generic[ModelT]):
     def __init__(self, session: Session):
         self.session = session
 
-    def _apply_order_by(self, query, page_filter: Annotated[FilterPage, Query()] = None):
-        order_by = getattr(page_filter, 'order_by', None) if page_filter else None
+    def _apply_order_by(
+        self, query, page_filter: Annotated[FilterPage, Query()] = None
+    ):
+        order_by = getattr(page_filter, "order_by", None) if page_filter else None
         if not order_by:
             order_by = self.default_order_by
         if order_by is None:
@@ -34,29 +36,29 @@ class BaseRepository(Generic[ModelT]):
         if not order_path:
             return query
 
-        path_parts = order_path.split('.')
+        path_parts = order_path.split(".")
         current_model = self.model
 
         for relation_name in path_parts[:-1]:
             relation_attr = getattr(current_model, relation_name, None)
-            relation_property = getattr(relation_attr, 'property', None)
+            relation_property = getattr(relation_attr, "property", None)
 
             if relation_attr is None or relation_property is None:
                 raise ValueError(
                     f'Invalid default_order_by relation "{relation_name}"'
-                    f' for {current_model.__name__}'
+                    f" for {current_model.__name__}"
                 )
 
-            if not hasattr(relation_property, 'mapper'):
+            if not hasattr(relation_property, "mapper"):
                 raise ValueError(
                     f'Invalid default_order_by path "{order_path}": "{relation_name}"'
-                    f' is not a relationship'
+                    f" is not a relationship"
                 )
 
             if relation_property.uselist:
                 raise ValueError(
                     f'Invalid default_order_by path "{order_path}":'
-                    f' collection relationships are not supported'
+                    f" collection relationships are not supported"
                 )
 
             query = query.outerjoin(relation_attr)
@@ -64,17 +66,17 @@ class BaseRepository(Generic[ModelT]):
 
         field_name = path_parts[-1]
         order_attr = getattr(current_model, field_name, None)
-        order_property = getattr(order_attr, 'property', None)
+        order_property = getattr(order_attr, "property", None)
 
         if order_attr is None or order_property is None:
             raise ValueError(
                 f'Invalid default_order_by field "{field_name}" for {current_model.__name__}'
             )
 
-        if not hasattr(order_property, 'columns'):
+        if not hasattr(order_property, "columns"):
             raise ValueError(
                 f'Invalid default_order_by path "{order_path}": '
-                f'last token must be a mapped column'
+                f"last token must be a mapped column"
             )
 
         return query.order_by(order_attr)
@@ -90,9 +92,9 @@ class BaseRepository(Generic[ModelT]):
             value = raw_filters[key]
             if value is None:
                 continue
-            if '_' not in key or not key.startswith(f'{relation}_'):
+            if "_" not in key or not key.startswith(f"{relation}_"):
                 continue
-            field = key.removeprefix(f'{relation}_').strip()
+            field = key.removeprefix(f"{relation}_").strip()
             if not field:
                 continue
 
@@ -103,19 +105,23 @@ class BaseRepository(Generic[ModelT]):
     @staticmethod
     def _resolve_model_attr(current_model, attr_name: str):
         model_attr = getattr(current_model, attr_name, None)
-        model_property = getattr(model_attr, 'property', None)
+        model_property = getattr(model_attr, "property", None)
         return model_attr, model_property
 
     @staticmethod
     def _build_name_predicate(model_attr, model_property, value: Any):
-        if not hasattr(model_property, 'mapper'):
+        if not hasattr(model_property, "mapper"):
             return None
 
         related_model = model_property.mapper.class_
-        name_attr = getattr(related_model, 'name', None)
-        name_property = getattr(name_attr, 'property', None)
+        name_attr = getattr(related_model, "name", None)
+        name_property = getattr(name_attr, "property", None)
 
-        if name_attr is None or name_property is None or not hasattr(name_property, 'columns'):
+        if (
+            name_attr is None
+            or name_property is None
+            or not hasattr(name_property, "columns")
+        ):
             return None
 
         if model_property.uselist:
@@ -124,7 +130,7 @@ class BaseRepository(Generic[ModelT]):
         return model_attr.has(name_attr == value)
 
     def _build_single_token_predicate(self, model_attr, model_property, value: Any):
-        if hasattr(model_property, 'columns'):
+        if hasattr(model_property, "columns"):
             return model_attr == value
 
         return self._build_name_predicate(model_attr, model_property, value)
@@ -136,7 +142,7 @@ class BaseRepository(Generic[ModelT]):
         path_tokens: list[str],
         value: Any,
     ):
-        if not hasattr(model_property, 'mapper'):
+        if not hasattr(model_property, "mapper"):
             return None
 
         related_model = model_property.mapper.class_
@@ -154,18 +160,24 @@ class BaseRepository(Generic[ModelT]):
 
         return model_attr.has(nested_predicate)
 
-    def _build_relation_predicate(self, current_model, path_tokens: list[str], value: Any):
+    def _build_relation_predicate(
+        self, current_model, path_tokens: list[str], value: Any
+    ):
         if not path_tokens:
             return None
 
-        model_attr, model_property = self._resolve_model_attr(current_model, path_tokens[0])
+        model_attr, model_property = self._resolve_model_attr(
+            current_model, path_tokens[0]
+        )
         if model_attr is None or model_property is None:
             return None
 
         if len(path_tokens) == 1:
             return self._build_single_token_predicate(model_attr, model_property, value)
 
-        return self._build_nested_predicate(model_attr, model_property, path_tokens, value)
+        return self._build_nested_predicate(
+            model_attr, model_property, path_tokens, value
+        )
 
     def _apply_relations_filters(
         self, query, relations_filters: dict[str, Any], relation: str
@@ -174,12 +186,12 @@ class BaseRepository(Generic[ModelT]):
             return query
 
         relation_attr = getattr(self.model, relation, None)
-        relation_property = getattr(relation_attr, 'property', None)
+        relation_property = getattr(relation_attr, "property", None)
 
         if relation_attr is None or relation_property is None:
             return query
 
-        if not hasattr(relation_property, 'mapper'):
+        if not hasattr(relation_property, "mapper"):
             return query
 
         relation_model = relation_property.mapper.class_
@@ -191,13 +203,17 @@ class BaseRepository(Generic[ModelT]):
             if value is None:
                 continue
 
-            path_tokens = field.split('__') if '__' in field else [field]
-            predicate = self._build_relation_predicate(relation_model, path_tokens, value)
+            path_tokens = field.split("__") if "__" in field else [field]
+            predicate = self._build_relation_predicate(
+                relation_model, path_tokens, value
+            )
 
             if predicate is None and len(path_tokens) == 1:
-                # Shorthand: pokemon_type -> pokemon.types.name
-                plural_path = [f'{path_tokens[0]}s', 'name']
-                predicate = self._build_relation_predicate(relation_model, plural_path, value)
+                # Shorthand: type -> pokemon.types.name
+                plural_path = [f"{path_tokens[0]}s", "name"]
+                predicate = self._build_relation_predicate(
+                    relation_model, plural_path, value
+                )
 
             if predicate is None and field in valid_columns:
                 predicate = getattr(relation_model, field) == value
@@ -234,7 +250,7 @@ class BaseRepository(Generic[ModelT]):
 
     async def list_all(self, page_filter: Annotated[FilterPage, Query()] = None):
         query = select(self.model)
-        relation = 'pokemon'
+        relation = "pokemon"
         relations_filters: dict[str, Any] = {}
 
         for option in self.relations:
@@ -243,16 +259,18 @@ class BaseRepository(Generic[ModelT]):
         if page_filter is not None:
             raw_filters = page_filter.model_dump(exclude_none=True)
 
-            raw_filters.pop('offset', None)
-            raw_filters.pop('limit', None)
-            raw_filters.pop('page', None)
-            raw_filters.pop('order_by', None)
+            raw_filters.pop("offset", None)
+            raw_filters.pop("limit", None)
+            raw_filters.pop("page", None)
+            raw_filters.pop("order_by", None)
 
             relations_filters = self._extract_relations_filters(raw_filters, relation)
 
             valid_columns = set(self.model.__mapper__.columns.keys())
             filters = {
-                k: v for k, v in raw_filters.items() if k in valid_columns and v is not None
+                k: v
+                for k, v in raw_filters.items()
+                if k in valid_columns and v is not None
             }
 
             if filters:
@@ -268,7 +286,9 @@ class BaseRepository(Generic[ModelT]):
             params = get_limit_offset_params(page_filter)
 
             if relations_filters:
-                count_query = select(func.count()).select_from(query.order_by(None).subquery())
+                count_query = select(func.count()).select_from(
+                    query.order_by(None).subquery()
+                )
                 total = int(await self.session.scalar(count_query) or 0)
 
                 paginated_query = query.limit(params.limit).offset(params.offset)
@@ -288,9 +308,9 @@ class BaseRepository(Generic[ModelT]):
             if isinstance(result_paginate, CustomLimitOffsetPage):
                 return result_paginate
 
-            total = getattr(result_paginate, 'total', None)
-            if total is None and hasattr(result_paginate, 'meta'):
-                total = getattr(result_paginate.meta, 'total', None)
+            total = getattr(result_paginate, "total", None)
+            if total is None and hasattr(result_paginate, "meta"):
+                total = getattr(result_paginate.meta, "total", None)
 
             return CustomLimitOffsetPage.create(
                 items=result_paginate.items,
@@ -304,17 +324,19 @@ class BaseRepository(Generic[ModelT]):
         query = select(self.model)
 
         has_special_filter = False
-        pokemon_name = kwargs.pop('pokemon_name', None)
+        pokemon_name = kwargs.pop("pokemon_name", None)
         if (
             pokemon_name is not None
-            and hasattr(self.model, 'pokemon_id')
-            and hasattr(self.model, 'pokemon')
+            and hasattr(self.model, "pokemon_id")
+            and hasattr(self.model, "pokemon")
         ):
             query = query.where(self.model.pokemon.has(name=pokemon_name))
             has_special_filter = True
 
         valid_columns = set(self.model.__mapper__.columns.keys())
-        filters = {k: v for k, v in kwargs.items() if k in valid_columns and v is not None}
+        filters = {
+            k: v for k, v in kwargs.items() if k in valid_columns and v is not None
+        }
 
         if not filters and not has_special_filter:
             return None

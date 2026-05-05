@@ -14,11 +14,11 @@ class RegisterSchema(BaseModel):
     date_of_birth: datetime
     password: str
 
-    @field_validator('password')
+    @field_validator("password")
     @classmethod
     def password_min_length(cls, value: str) -> str:
         if len(value) < 8:
-            raise ValueError('Password must be at least 8 characters')
+            raise ValueError("Password must be at least 8 characters")
         return value
 
 
@@ -40,7 +40,19 @@ class LoginSchema(BaseModel):
 
 class LoginResponseSchema(BaseModel):
     access_token: str
-    token_type: str = 'bearer'
+    token_type: str = "bearer"
+
+
+class TrainerResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    pokeballs: int
+    capture_rate: int
+    created_at: datetime
+    updated_at: datetime | None = None
+    deleted_at: datetime | None = None
 
 
 class AuthResponseSchema(BaseModel):
@@ -48,7 +60,7 @@ class AuthResponseSchema(BaseModel):
 
     id: UUID
     name: str
-    email: str        
+    email: str
     status: StatusEnum
     username: str
     created_at: datetime
@@ -58,3 +70,4 @@ class AuthResponseSchema(BaseModel):
     authentication_success: int | None = None
     authentication_failures: int | None = None
     last_authentication_at: datetime | None = None
+    trainer: TrainerResponseSchema | None = None

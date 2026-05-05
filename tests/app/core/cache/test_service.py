@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 from fastapi_pagination import LimitOffsetPage
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.core.cache.manager import CacheManager
 from app.core.cache.service import CacheService
@@ -19,7 +19,7 @@ class BaseModelSchema(BaseModel):
     value: int
 
 
-MOCK_ITEM = BaseModelSchema(id='mock_id', name='mock_name', value=42)
+MOCK_ITEM = BaseModelSchema(id="mock_id", name="mock_name", value=42)
 
 
 @pytest_asyncio.fixture
@@ -34,12 +34,12 @@ async def cache_service(redis_client):
     return TestableCacheService(
         logger_params=LoggingParams(
             logger=logging.getLogger(__name__),
-            service='cache_service',
-            operation='test_cache',
+            service="cache_service",
+            operation="test_cache",
         ),
         redis_client=redis_client,
-        alias='test_cache',
-        prefix='test_cache',
+        alias="test_cache",
+        prefix="test_cache",
     )
 
 
@@ -49,7 +49,7 @@ class TestCacheServiceBuildKeyList:
     async def test_cache_service_build_key_list(cache_service):
         page_filter = FilterPage(offset=0, limit=10)
         key = cache_service.build_key_list(page_filter)
-        assert key.startswith(f'{cache_service.prefix}:list')
+        assert key.startswith(f"{cache_service.prefix}:list")
 
 
 class TestCacheServiceGetList:
@@ -75,21 +75,21 @@ class TestCacheServiceGetList:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_get_list_skips_non_dict_entries(cache_service):
-        key = 'test_cache:list:test'
+        key = "test_cache:list:test"
         total_result = 2
         cached_data = {
-            'type': 'list',
-            'data': [
+            "type": "list",
+            "data": [
                 {
-                    'id': '1',
-                    'name': 'bulbasaur',
-                    'value': 1,
+                    "id": "1",
+                    "name": "bulbasaur",
+                    "value": 1,
                 },
-                'not_a_dict',
+                "not_a_dict",
                 {
-                    'id': '2',
-                    'name': 'ivysaur',
-                    'value': 2,
+                    "id": "2",
+                    "name": "ivysaur",
+                    "value": 2,
                 },
             ],
         }
@@ -102,14 +102,14 @@ class TestCacheServiceGetList:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_get_list_paginate_type(cache_service):
-        key = 'test_cache:list:paginate'
+        key = "test_cache:list:paginate"
         page_obj = LimitOffsetPage[BaseModelSchema](
             items=[MOCK_ITEM],
             limit=10,
             offset=0,
             total=1,
         )
-        cached_data = {'type': 'paginate', 'data': page_obj.model_dump(mode='json')}
+        cached_data = {"type": "paginate", "data": page_obj.model_dump(mode="json")}
         cache_service.cache.get_cache = AsyncMock(return_value=cached_data)
         result = await cache_service.get_list(key)
         assert isinstance(result, LimitOffsetPage)
@@ -117,25 +117,27 @@ class TestCacheServiceGetList:
 
     @staticmethod
     @pytest.mark.asyncio
-    async def test_cache_service_get_list_returns_none_for_invalid_cached_schema(cache_service):
-        key = 'test_cache:list:custom-paginate'
+    async def test_cache_service_get_list_returns_none_for_invalid_cached_schema(
+        cache_service,
+    ):
+        key = "test_cache:list:custom-paginate"
         cached_data = {
-            'type': 'custom-paginate',
-            'data': {
-                'items': [
+            "type": "custom-paginate",
+            "data": {
+                "items": [
                     {
-                        'id': '1',
-                        'name': 'bulbasaur',
+                        "id": "1",
+                        "name": "bulbasaur",
                     }
                 ],
-                'meta': {
-                    'total': 1,
-                    'limit': 10,
-                    'offset': 0,
-                    'next_page': None,
-                    'previous_page': None,
-                    'total_pages': 1,
-                    'current_page': 1,
+                "meta": {
+                    "total": 1,
+                    "limit": 10,
+                    "offset": 0,
+                    "next_page": None,
+                    "previous_page": None,
+                    "total_pages": 1,
+                    "current_page": 1,
                 },
             },
         }
@@ -150,7 +152,7 @@ class TestCacheServiceSetList:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_set_list_paginate(cache_service):
-        key = f'{cache_service.prefix}:list:paginate'
+        key = f"{cache_service.prefix}:list:paginate"
         page_obj = LimitOffsetPage[BaseModelSchema](
             items=[MOCK_ITEM],
             limit=10,
@@ -165,7 +167,7 @@ class TestCacheServiceSetList:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_set_all_list(cache_service):
-        key = f'{cache_service.prefix}:list'
+        key = f"{cache_service.prefix}:list"
 
         cache_service.cache.set_cache = AsyncMock(return_value=None)
         result = await cache_service.set_list(key, [MOCK_ITEM])
@@ -174,16 +176,51 @@ class TestCacheServiceSetList:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_set_all_list_with_ttl(cache_service):
-        key = f'{cache_service.prefix}:list'
+        key = f"{cache_service.prefix}:list"
 
         cache_service.cache.set_cache = AsyncMock(return_value=None)
-        result = await cache_service.set_list(key, [MOCK_ITEM], 400)
+        result = await cache_service.set_list(key, [MOCK_ITEM], ttl=400)
         assert result is None
 
     @staticmethod
     @pytest.mark.asyncio
+    async def test_cache_service_set_list_uses_custom_serializer(cache_service):
+        key = f"{cache_service.prefix}:list:custom"
+        cache_service.cache.set_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.set_list(
+            key,
+            [MOCK_ITEM],
+            result_list_cache_serialize=lambda data: [{"custom": len(data)}],
+        )
+
+        assert result is None
+        cache_service.cache.set_cache.assert_awaited_once_with(
+            key, {"type": "list", "data": [{"custom": 1}]}, cache_service.ttl
+        )
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_cache_service_set_list_handles_validation_error(cache_service, monkeypatch):
+        key = f"{cache_service.prefix}:list:invalid"
+        cache_service.cache.set_cache = AsyncMock(return_value=None)
+
+        def raise_validation_error(_item):
+            raise ValidationError.from_exception_data("BaseModelSchema", [])
+
+        monkeypatch.setattr(cache_service.schema_class, "model_validate", raise_validation_error)
+
+        result = await cache_service.set_list(key, [object()])
+
+        assert result is None
+        cache_service.cache.set_cache.assert_awaited_once_with(
+            key, {"type": "list", "data": None}, cache_service.ttl
+        )
+
+    @staticmethod
+    @pytest.mark.asyncio
     async def test_cache_service_set_list_invalid_type(cache_service):
-        key = f'{cache_service.prefix}:list'
+        key = f"{cache_service.prefix}:list"
         invalid_data = object()
         cache_service.cache.set_cache = AsyncMock(return_value=None)
         result = await cache_service.set_list(key, invalid_data)
@@ -194,8 +231,8 @@ class TestCacheServiceBuildKeyOne:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_build_key_one(cache_service):
-        key = cache_service.build_key_one('one')
-        assert key.startswith(f'{cache_service.prefix}:one')
+        key = cache_service.build_key_one("one")
+        assert key.startswith(f"{cache_service.prefix}:one")
 
 
 class TestCacheServiceGetOne:
@@ -204,24 +241,41 @@ class TestCacheServiceGetOne:
     async def test_cache_service_get_one_returns_none_when_cache_misses(
         cache_service,
     ):
-        key = 'test_cache:name'
+        key = "test_cache:name"
         result = await cache_service.get_one(key)
         assert result is None
 
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_get_one_returns_schema(cache_service):
-        key = 'test_cache:name'
+        key = "test_cache:name"
         await cache_service.set_one(key, MOCK_ITEM)
         result = await cache_service.get_one(key)
         assert isinstance(result, BaseModelSchema)
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_cache_service_get_one_returns_none_for_invalid_schema(
+        cache_service, monkeypatch
+    ):
+        key = "test_cache:invalid"
+        cache_service.cache.get_cache = AsyncMock(return_value={"bad": "payload"})
+
+        def raise_validation_error(_payload):
+            raise ValidationError.from_exception_data("BaseModelSchema", [])
+
+        monkeypatch.setattr(cache_service.schema_class, "model_validate", raise_validation_error)
+
+        result = await cache_service.get_one(key)
+
+        assert result is None
 
 
 class TestCacheServiceSetOne:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_set_one(cache_service):
-        key = 'test_cache:name'
+        key = "test_cache:name"
         cache_service.cache.set_cache = AsyncMock(return_value=None)
         result = await cache_service.set_one(key, MOCK_ITEM)
         assert result is None
@@ -229,15 +283,58 @@ class TestCacheServiceSetOne:
     @staticmethod
     @pytest.mark.asyncio
     async def test_cache_service_set_one_with_ttl(cache_service):
-        key = 'test_cache:name'
+        key = "test_cache:name"
         cache_service.cache.set_cache = AsyncMock(return_value=None)
-        result = await cache_service.set_one(key, MOCK_ITEM, 300)
+        result = await cache_service.set_one(key, MOCK_ITEM, ttl=300)
         assert result is None
 
     @staticmethod
     @pytest.mark.asyncio
+    async def test_cache_service_set_one_uses_custom_serializer(cache_service):
+        key = "test_cache:name:custom"
+        cache_service.cache.set_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.set_one(
+            key,
+            MOCK_ITEM,
+            result_list_cache_serialize=lambda data: {"custom": data.id},
+        )
+
+        assert result is None
+        cache_service.cache.set_cache.assert_awaited_once_with(
+            key, {"custom": MOCK_ITEM.id}, cache_service.ttl
+        )
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_cache_service_set_one_handles_validation_error(cache_service, monkeypatch):
+        key = "test_cache:name:invalid"
+        cache_service.cache.set_cache = AsyncMock(return_value=None)
+
+        def raise_validation_error(_payload):
+            raise ValidationError.from_exception_data("BaseModelSchema", [])
+
+        monkeypatch.setattr(cache_service.schema_class, "model_validate", raise_validation_error)
+
+        result = await cache_service.set_one(key, MOCK_ITEM)
+
+        assert result is None
+        cache_service.cache.set_cache.assert_awaited_once_with(key, None, cache_service.ttl)
+
+    @staticmethod
+    @pytest.mark.asyncio
     async def test_cache_service_set_one_when_not_received_data(cache_service):
-        key = 'test_cache:name'
+        key = "test_cache:name"
         cache_service.cache.set_cache = AsyncMock(return_value=None)
         result = await cache_service.set_one(key, None)
         assert result is None
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_cache_service_delete_domain(cache_service):
+        cache_service.cache.delete_pattern = AsyncMock(return_value=None)
+
+        result = await cache_service.delete_domain()
+
+        assert result is None
+        cache_service.cache.delete_pattern.assert_awaited_once_with("test_cache*")

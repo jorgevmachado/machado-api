@@ -7,12 +7,12 @@ from app.models.user import User
 
 def test_user_and_trainer_model_instantiation():
     user = User(
-        name='john Doe',
-        email='john@doe.com',
-        username='johndoe',
+        name="john Doe",
+        email="john@doe.com",
+        username="johndoe",
         gender=GenderEnum.MALE,
         status=StatusEnum.ACTIVE,
-        password='secret',
+        password="secret",
         date_of_birth=datetime(1990, 7, 20, tzinfo=timezone.utc),
         total_authentications=0,
         authentication_success=0,
@@ -24,9 +24,9 @@ def test_user_and_trainer_model_instantiation():
         capture_rate=45,
     )
 
-    assert user.name == 'john Doe'
-    assert user.email == 'john@doe.com'
-    assert user.username == 'johndoe'
+    assert user.name == "john Doe"
+    assert user.email == "john@doe.com"
+    assert user.username == "johndoe"
     assert user.gender == GenderEnum.MALE
     assert user.status == StatusEnum.ACTIVE
     assert user.total_authentications == 0

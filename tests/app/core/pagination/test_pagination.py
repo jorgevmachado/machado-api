@@ -55,8 +55,8 @@ class TestPaginationExceptionPagination:
     def test_exception_pagination_paginate_valid():
         """Should return paginated page when FilterPage is valid"""
         result = exception_pagination(FilterPage(offset=0, limit=10))
-        assert hasattr(result, 'items')
-        assert hasattr(result, 'meta')
+        assert hasattr(result, "items")
+        assert hasattr(result, "meta")
         assert len(result.items) == 0
         assert result.meta.total == 0
 
@@ -79,10 +79,10 @@ class TestPaginationExceptionPagination:
         offset = 1000
         result = exception_pagination(FilterPage(offset=offset, limit=limit))
 
-        assert hasattr(result, 'items')
+        assert hasattr(result, "items")
         assert isinstance(result.items, list)
         assert len(result.items) == 0
-        assert hasattr(result, 'meta')
+        assert hasattr(result, "meta")
         assert result.meta.total == 0
         assert result.meta.offset == offset
         assert result.meta.limit == limit
@@ -93,9 +93,9 @@ class TestPaginationExceptionPagination:
         limit = 100
         result = exception_pagination(FilterPage(offset=0, limit=limit))
 
-        assert hasattr(result, 'items')
+        assert hasattr(result, "items")
         assert len(result.items) == 0
-        assert hasattr(result, 'meta')
+        assert hasattr(result, "meta")
         assert result.meta.total == 0
         assert result.meta.limit == limit
 
@@ -119,7 +119,8 @@ class TestPaginationExceptionPagination:
     def test_exception_pagination_catch_exception():
         """Should catch exception and return empty list when LimitOffsetParams raises error"""
         with patch(
-            'app.core.pagination.pagination.is_paginate', side_effect=Exception('Test error')
+            "app.core.pagination.pagination.is_paginate",
+            side_effect=Exception("Test error"),
         ):
             result = exception_pagination(FilterPage(offset=0, limit=10))
 
@@ -131,10 +132,10 @@ class TestPaginationExceptionPagination:
     def test_exception_pagination_catch_exception_limit_offset_params():
         """Should catch exception when LimitOffsetParams creation fails"""
         with (
-            patch('app.core.pagination.pagination.is_paginate', return_value=True),
+            patch("app.core.pagination.pagination.is_paginate", return_value=True),
             patch(
-                'app.core.pagination.pagination.LimitOffsetParams',
-                side_effect=ValueError('Invalid params'),
+                "app.core.pagination.pagination.LimitOffsetParams",
+                side_effect=ValueError("Invalid params"),
             ),
         ):
             result = exception_pagination(FilterPage(offset=0, limit=10))
