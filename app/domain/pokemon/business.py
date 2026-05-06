@@ -18,7 +18,7 @@ POKEMON_EXTERNAL_IMAGE_URL = "https://www.pokemon.com/static-assets/content-asse
 
 
 def format_pokemon_image_order(order: int | str) -> str:
-    return str(int(order)).zfill(4)
+    return str(int(order)).zfill(3)
 
 
 def build_external_image(order: int | str) -> str:

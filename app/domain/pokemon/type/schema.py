@@ -4,18 +4,25 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.infrastructure.external_api.schemas import NamedExternalResourceSchema
-from app.models import PokemonType
+from app.models import PokemonType, PokemonStatusEnum
 
 
 class PokemonTypeDamageSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    url: str | None = None
     name: str
     order: int | None = None
-    url: str | None = None
+    status: PokemonStatusEnum | None = None
     text_color: str | None = None
+    badge_url: str | None = None
+    badge_icon_url: str | None = None
     background_color: str | None = None
+    badge_shield_url: str | None = None
+    badge_legends_url: str | None = None
+    badge_legend_icon_url: str | None = None
+    badge_shield_icon_url: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
@@ -29,9 +36,15 @@ class PokemonTypeSchema(BaseModel):
     name: str
     order: int
     text_color: str
-    weaknesses: list[PokemonTypeDamageSchema] = []
+    badge_url: str | None = None
     strengths: list[PokemonTypeDamageSchema] = []
-    background_color: str
+    weaknesses: list[PokemonTypeDamageSchema] = []
+    badge_icon_url: str | None = None
+    background_color: str | None = None
+    badge_shield_url: str | None = None
+    badge_legends_url: str | None = None
+    badge_legend_icon_url: str | None = None
+    badge_shield_icon_url: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
