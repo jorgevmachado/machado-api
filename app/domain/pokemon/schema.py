@@ -15,6 +15,38 @@ from app.domain.pokemon.shape.schema import PokemonShapeSchema
 from app.domain.pokemon.type.schema import PokemonTypeSchema
 from app.models.enums import PokemonStatusEnum
 
+class PokemonEvolutionSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    hp: int
+    name: str
+    order: int
+    images: PokemonImageSchema | None = None
+    speed: int
+    height: int
+    weight: int
+    status: PokemonStatusEnum
+    attack: int
+    defense: int
+    is_baby: bool
+    gender_rate: int
+    is_mythical: bool
+    description: str | None = None
+    is_legendary: bool
+    capture_rate: int
+    hatch_counter: int
+    base_happiness: int
+    external_image: str
+    special_attack: int
+    special_defense: int
+    base_experience: int
+    evolution_chain: str | None = None
+    evolves_from_species: str | None = None
+    has_gender_differences: bool
+    created_at: datetime
+    updated_at: datetime | None = None
+    deleted_at: datetime | None = None
 
 class PokemonSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -36,6 +68,7 @@ class PokemonSchema(BaseModel):
     is_baby: bool
     habitat: PokemonHabitatSchema | None = None
     abilities: list[PokemonAbilitySchema] = []
+    evolutions: list[PokemonEvolutionSchema] = []
     encounters: list[PokemonEncounterSchema] = []
     growth_rate: PokemonGrowthRateSchema | None = None
     gender_rate: int
@@ -100,4 +133,9 @@ class PokemonSchema(BaseModel):
             serialized["shape"] = PokemonShapeSchema.model_validate(
                 serialized["shape"]
             ).model_dump(mode="json")
+        if 'evolutions' in serialized and serialized['evolutions']:
+            serialized['evolutions'] = [
+                PokemonEvolutionSchema.model_validate(evo).model_dump(mode='json')
+                for evo in serialized['evolutions']
+            ]
         return serialized
