@@ -91,6 +91,18 @@ class PokemonExternalTypeSchema(PokeApiPayloadSchema):
     name: str
     sprites: dict[str, Any] | None = None
     damage_relations: dict[str, Any] | None = None
+    move_damage_class: NamedExternalResourceSchema | None = None
+
+
+class PokemonExternalDescriptionSchema(BaseModel):
+    language: NamedExternalResourceSchema
+    description: str
+
+
+class PokemonExternalMoveDamageClassSchema(PokeApiPayloadSchema):
+    id: int
+    name: str
+    descriptions: list[PokemonExternalDescriptionSchema] = []
 
 
 class PokemonExternalAbilitySchema(PokeApiPayloadSchema):
@@ -98,11 +110,6 @@ class PokemonExternalAbilitySchema(PokeApiPayloadSchema):
     name: str
     effect_entries: list[PokemonExternalEffectEntrySchema] = []
     flavor_text_entries: list[PokemonExternalFlavorTextEntrySchema] = []
-
-
-class PokemonExternalDescriptionSchema(BaseModel):
-    language: NamedExternalResourceSchema
-    description: str
 
 
 class PokemonExternalGrowthRateSchema(PokeApiPayloadSchema):

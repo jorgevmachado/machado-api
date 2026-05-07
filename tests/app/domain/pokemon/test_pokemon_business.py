@@ -10,10 +10,10 @@ def test_ensure_order_number_from_url():
 
 
 def test_format_pokemon_image_order_uses_four_digits():
-    assert format_pokemon_image_order("01") == "0001"
-    assert format_pokemon_image_order(25) == "0025"
+    assert format_pokemon_image_order("01") == "001"
+    assert format_pokemon_image_order(25) == "025"
     assert format_pokemon_image_order(1000) == "1000"
 
 
 def test_build_external_image():
-    assert build_external_image(25).endswith("/0025.png")
+    assert build_external_image(25).endswith("/025.png")

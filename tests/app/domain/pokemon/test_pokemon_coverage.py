@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from fastapi_pagination import LimitOffsetPage
@@ -72,14 +73,28 @@ async def test_fragment_from_session_factories():
     session = SimpleNamespace()
     client = SimpleNamespace()
 
-    assert isinstance(PokemonAbilityService.from_session(session, client), PokemonAbilityService)
-    assert isinstance(PokemonEncounterService.from_session(session, client), PokemonEncounterService)
-    assert isinstance(PokemonGrowthRateService.from_session(session, client), PokemonGrowthRateService)
-    assert isinstance(PokemonHabitatService.from_session(session, client), PokemonHabitatService)
+    assert isinstance(
+        PokemonAbilityService.from_session(session, client), PokemonAbilityService
+    )
+    assert isinstance(
+        PokemonEncounterService.from_session(session, client), PokemonEncounterService
+    )
+    assert isinstance(
+        PokemonGrowthRateService.from_session(session, client), PokemonGrowthRateService
+    )
+    assert isinstance(
+        PokemonHabitatService.from_session(session, client), PokemonHabitatService
+    )
     assert isinstance(PokemonImageService.from_session(session), PokemonImageService)
-    assert isinstance(PokemonMoveService.from_session(session, client), PokemonMoveService)
-    assert isinstance(PokemonShapeService.from_session(session, client), PokemonShapeService)
-    assert isinstance(PokemonTypeService.from_session(session, client), PokemonTypeService)
+    assert isinstance(
+        PokemonMoveService.from_session(session, client), PokemonMoveService
+    )
+    assert isinstance(
+        PokemonShapeService.from_session(session, client), PokemonShapeService
+    )
+    assert isinstance(
+        PokemonTypeService.from_session(session, client), PokemonTypeService
+    )
 
 
 @pytest.mark.asyncio
@@ -120,7 +135,13 @@ async def test_ability_service_sync_and_missing_external():
 
     service.get_or_create = AsyncMock(return_value="ability")
     result = await service.sync_from_resources(
-        [{"ability": {"url": "https://pokeapi.co/api/v2/ability/65/"}, "slot": 2, "is_hidden": True}]
+        [
+            {
+                "ability": {"url": "https://pokeapi.co/api/v2/ability/65/"},
+                "slot": 2,
+                "is_hidden": True,
+            }
+        ]
     )
     assert result == ["ability"]
 
@@ -156,7 +177,8 @@ async def test_move_service_get_or_create_existing_new_and_missing_external():
     assert created.short_effect == "Thing"
 
     service = PokemonMoveService(
-        _repo(find_by=None), client=SimpleNamespace(get_move=AsyncMock(return_value=None))
+        _repo(find_by=None),
+        client=SimpleNamespace(get_move=AsyncMock(return_value=None)),
     )
     with pytest.raises(ValueError, match="External move"):
         await service.get_or_create(order=404)
@@ -178,10 +200,25 @@ async def test_move_service_sync_from_resources():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("service_cls, model_name", [
-    (PokemonHabitatService, "PokemonHabitat"),
-    (PokemonShapeService, "PokemonShape"),
-])
+async def test_move_service_sync_from_resources_skips_timeout():
+    service = PokemonMoveService(_repo(), client=SimpleNamespace())
+    service.get_or_create = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
+
+    result = await service.sync_from_resources(
+        [{"url": "https://pokeapi.co/api/v2/move/33/"}]
+    )
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "service_cls, model_name",
+    [
+        (PokemonHabitatService, "PokemonHabitat"),
+        (PokemonShapeService, "PokemonShape"),
+    ],
+)
 async def test_simple_resource_services(service_cls, model_name):
     existing = SimpleNamespace(order=1)
     service = service_cls(_repo(find_by=existing), client=SimpleNamespace())
@@ -204,7 +241,9 @@ async def test_simple_resource_services(service_cls, model_name):
 @pytest.mark.asyncio
 async def test_growth_rate_service_paths():
     existing = SimpleNamespace(order=1)
-    service = PokemonGrowthRateService(_repo(find_by=existing), client=SimpleNamespace())
+    service = PokemonGrowthRateService(
+        _repo(find_by=existing), client=SimpleNamespace()
+    )
     assert await service.get_or_create(order=1) is existing
     assert await service.sync_from_resource(None) is None
 
@@ -268,10 +307,14 @@ async def test_encounter_service_success_and_validation_paths():
         ({"url": "url"}, "Name cannot be None"),
         ({"url": "url", "name": "name"}, "version_details"),
         ({"url": "url", "name": "name", "version_details": [{}]}, "version"),
-            (
-                {"url": "url", "name": "name", "version_details": [{"version": {"name": ""}}]},
-                "version name",
-            ),
+        (
+            {
+                "url": "url",
+                "name": "name",
+                "version_details": [{"version": {"name": ""}}],
+            },
+            "version name",
+        ),
         (
             {
                 "url": "url",
@@ -295,7 +338,10 @@ async def test_encounter_service_success_and_validation_paths():
                 "url": "url",
                 "name": "name",
                 "version_details": [
-                    {"version": {"name": "red"}, "encounter_details": [{"method": None}]}
+                    {
+                        "version": {"name": "red"},
+                        "encounter_details": [{"method": None}],
+                    }
                 ],
             },
             "method",
@@ -305,19 +351,23 @@ async def test_encounter_service_success_and_validation_paths():
                 "url": "url",
                 "name": "name",
                 "version_details": [
-                        {
-                            "version": {"name": "red"},
-                            "encounter_details": [{"method": {"name": ""}}],
-                        }
-                    ],
-                },
+                    {
+                        "version": {"name": "red"},
+                        "encounter_details": [{"method": {"name": ""}}],
+                    }
+                ],
+            },
             "method name",
         ),
     ]
     for entry, message in invalid_cases:
         with pytest.raises(ValueError, match=message):
             await service.get_or_create(
-                pokemon_id=pokemon_id, order=99, url=entry.get("url"), name=entry.get("name"), entry=entry if entry else None
+                pokemon_id=pokemon_id,
+                order=99,
+                url=entry.get("url"),
+                name=entry.get("name"),
+                entry=entry if entry else None,
             )
 
 
@@ -333,9 +383,15 @@ def test_type_business_branches():
     badges = ensure_badges(
         {
             "generation-viii": {
-                "brilliant-diamond-shining-pearl": {"name_icon": "name", "symbol_icon": "symbol"},
+                "brilliant-diamond-shining-pearl": {
+                    "name_icon": "name",
+                    "symbol_icon": "symbol",
+                },
                 "sword-shield": {"name_icon": "shield", "symbol_icon": "shield-symbol"},
-                "legends-arceus": {"name_icon": "legend", "symbol_icon": "legend-symbol"},
+                "legends-arceus": {
+                    "name_icon": "legend",
+                    "symbol_icon": "legend-symbol",
+                },
             }
         }
     )
@@ -346,9 +402,13 @@ def test_type_business_branches():
     assert empty_relations.weaknesses == []
     relations = ensure_damage_relations(
         {
-            "double_damage_from": [{"name": "fire", "url": "https://pokeapi.co/api/v2/type/10/"}],
+            "double_damage_from": [
+                {"name": "fire", "url": "https://pokeapi.co/api/v2/type/10/"}
+            ],
             "half_damage_from": [None, {"name": None, "url": "url"}],
-            "double_damage_to": [{"name": "grass", "url": "https://pokeapi.co/api/v2/type/12/"}],
+            "double_damage_to": [
+                {"name": "grass", "url": "https://pokeapi.co/api/v2/type/12/"}
+            ],
             "half_damage_to": [],
         }
     )
@@ -367,9 +427,13 @@ async def test_type_service_paths():
     assert existing_resource.pokemon_type is existing
 
     with pytest.raises(ValueError, match="Name cannot be None"):
-        await PokemonTypeService(_repo(find_by=None), client=SimpleNamespace()).get_or_create(order=2)
+        await PokemonTypeService(
+            _repo(find_by=None), client=SimpleNamespace()
+        ).get_or_create(order=2)
 
-    external = SimpleNamespace(sprites=None, damage_relations=None)
+    external = SimpleNamespace(
+        sprites=None, damage_relations=None, move_damage_class=None
+    )
     repo = _repo(find_by=None)
     service = PokemonTypeService(
         repo, client=SimpleNamespace(get_type=AsyncMock(return_value=external))
@@ -380,27 +444,44 @@ async def test_type_service_paths():
     assert created.pokemon_type.name == "fire"
 
     service = PokemonTypeService(
-        _repo(find_by=None), client=SimpleNamespace(get_type=AsyncMock(return_value=None))
+        _repo(find_by=None),
+        client=SimpleNamespace(get_type=AsyncMock(return_value=None)),
     )
     with pytest.raises(ValueError, match="Failed to retrieve external type"):
         await service.get_or_create(order=99, name="missing")
 
     service = PokemonTypeService(_repo(find_by=None), client=SimpleNamespace())
-    service.get_or_create = AsyncMock(side_effect=[None, SimpleNamespace(pokemon_type="damage")])
+    service.get_or_create = AsyncMock(
+        side_effect=[None, SimpleNamespace(pokemon_type="damage")]
+    )
     damages = await service.sync_from_damages(
         [
-            NamedExternalResourceSchema(name="skip", url="https://pokeapi.co/api/v2/type/1/"),
-            NamedExternalResourceSchema(name="ok", url="https://pokeapi.co/api/v2/type/2/"),
+            NamedExternalResourceSchema(
+                name="skip", url="https://pokeapi.co/api/v2/type/1/"
+            ),
+            NamedExternalResourceSchema(
+                name="ok", url="https://pokeapi.co/api/v2/type/2/"
+            ),
         ]
     )
     assert damages == ["damage"]
 
-    pokemon_type = SimpleNamespace(status=PokemonStatusEnum.INCOMPLETE, weaknesses=[], strengths=[])
+    pokemon_type = SimpleNamespace(
+        status=PokemonStatusEnum.INCOMPLETE, weaknesses=[], strengths=[]
+    )
     service.sync_from_damages = AsyncMock(side_effect=[["weak"], ["strong"]])
     updated = await service.update_damages(
         pokemon_type,
-        [NamedExternalResourceSchema(name="weak", url="https://pokeapi.co/api/v2/type/1/")],
-        [NamedExternalResourceSchema(name="strong", url="https://pokeapi.co/api/v2/type/2/")],
+        [
+            NamedExternalResourceSchema(
+                name="weak", url="https://pokeapi.co/api/v2/type/1/"
+            )
+        ],
+        [
+            NamedExternalResourceSchema(
+                name="strong", url="https://pokeapi.co/api/v2/type/2/"
+            )
+        ],
     )
     assert updated.status == PokemonStatusEnum.COMPLETE
 
@@ -426,6 +507,25 @@ async def test_type_service_paths():
 
 
 @pytest.mark.asyncio
+async def test_type_service_update_description_existing_and_external_description():
+    service = PokemonTypeService(
+        _repo(),
+        client=SimpleNamespace(
+            get_move_damage_class_by_url=AsyncMock(
+                return_value=SimpleNamespace(descriptions=_text_entries())
+            )
+        ),
+    )
+
+    assert await service.update_description(None, description="Already set") == (
+        "Already set"
+    )
+    assert await service.update_description("https://pokeapi.co/api/v2/move-damage-class/2/") == (
+        "Description"
+    )
+
+
+@pytest.mark.asyncio
 async def test_type_service_get_or_create_without_damage_relations(monkeypatch):
     monkeypatch.setattr(
         "app.domain.pokemon.type.service.ensure_damage_relations",
@@ -435,7 +535,11 @@ async def test_type_service_get_or_create_without_damage_relations(monkeypatch):
     service = PokemonTypeService(
         repo,
         client=SimpleNamespace(
-            get_type=AsyncMock(return_value=SimpleNamespace(sprites=None, damage_relations={}))
+            get_type=AsyncMock(
+                return_value=SimpleNamespace(
+                    sprites=None, damage_relations={}, move_damage_class=None
+                )
+            )
         ),
     )
 
@@ -447,18 +551,33 @@ async def test_type_service_get_or_create_without_damage_relations(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_type_service_find_one_enriches_incomplete_and_returns_complete(monkeypatch):
-    incomplete = SimpleNamespace(name="fire", status=PokemonStatusEnum.INCOMPLETE)
-    service = PokemonTypeService(_repo(find_by=incomplete), client=SimpleNamespace())
+async def test_type_service_find_one_enriches_incomplete_and_returns_complete(
+    monkeypatch,
+):
+    incomplete = SimpleNamespace(
+        name="fire",
+        status=PokemonStatusEnum.INCOMPLETE,
+        description=None,
+        url="https://pokeapi.co/api/v2/type/10/",
+    )
+    service = PokemonTypeService(
+        _repo(find_by=incomplete),
+        client=SimpleNamespace(
+            get_move_damage_class_by_url=AsyncMock(return_value=None)
+        ),
+    )
     service.cache_service.delete_domain = AsyncMock()
     service.client.get_type = AsyncMock(
         return_value=SimpleNamespace(
             damage_relations={
-                "double_damage_from": [{"name": "water", "url": "https://pokeapi.co/api/v2/type/11/"}],
+                "double_damage_from": [
+                    {"name": "water", "url": "https://pokeapi.co/api/v2/type/11/"}
+                ],
                 "half_damage_from": [],
                 "double_damage_to": [],
                 "half_damage_to": [],
-            }
+            },
+            move_damage_class=None,
         )
     )
     service.update_damages = AsyncMock(return_value="updated")
@@ -470,15 +589,37 @@ async def test_type_service_find_one_enriches_incomplete_and_returns_complete(mo
     service = PokemonTypeService(_repo(find_by=complete), client=SimpleNamespace())
     assert await service.find_one("water") is complete
 
-    incomplete = SimpleNamespace(name="missing", status=PokemonStatusEnum.INCOMPLETE)
-    service = PokemonTypeService(_repo(find_by=incomplete), client=SimpleNamespace())
+    incomplete = SimpleNamespace(
+        name="missing",
+        status=PokemonStatusEnum.INCOMPLETE,
+        description=None,
+        url="https://pokeapi.co/api/v2/type/999/",
+    )
+    service = PokemonTypeService(
+        _repo(find_by=incomplete),
+        client=SimpleNamespace(
+            get_move_damage_class_by_url=AsyncMock(return_value=None)
+        ),
+    )
     service.client.get_type = AsyncMock(return_value=None)
     with pytest.raises(ValueError, match="Failed to retrieve external type"):
         await service.find_one("missing")
 
-    incomplete = SimpleNamespace(name="plain", status=PokemonStatusEnum.INCOMPLETE)
-    service = PokemonTypeService(_repo(find_by=incomplete), client=SimpleNamespace())
-    service.client.get_type = AsyncMock(return_value=SimpleNamespace(damage_relations=None))
+    incomplete = SimpleNamespace(
+        name="plain",
+        status=PokemonStatusEnum.INCOMPLETE,
+        description=None,
+        url="https://pokeapi.co/api/v2/type/1/",
+    )
+    service = PokemonTypeService(
+        _repo(find_by=incomplete),
+        client=SimpleNamespace(
+            get_move_damage_class_by_url=AsyncMock(return_value=None)
+        ),
+    )
+    service.client.get_type = AsyncMock(
+        return_value=SimpleNamespace(damage_relations=None, move_damage_class=None)
+    )
     monkeypatch.setattr(
         "app.domain.pokemon.type.service.ensure_damage_relations",
         lambda _relations: None,
@@ -543,7 +684,10 @@ async def test_image_repository_and_service_paths(monkeypatch):
     existing = SimpleNamespace(id=uuid4())
     service = PokemonImageService(_repo(find_by=existing))
     assert await service.sync_from_sprites(1, {"front_default": "front"}) is existing
-    assert await PokemonImageService(_repo(find_by=None)).sync_from_sprites(1, None) is None
+    assert (
+        await PokemonImageService(_repo(find_by=None)).sync_from_sprites(1, None)
+        is None
+    )
 
     service = PokemonImageService(_repo(find_by=None))
     created = await service.sync_from_sprites(
@@ -560,9 +704,15 @@ async def test_image_repository_and_service_paths(monkeypatch):
 
 
 def test_pokemon_business_serializers_and_stats():
-    assert pokemon_business.first_english_flavor_text(
-        [{"language": {"name": "pt"}, "flavor_text": "Nao"}, {"language": {"name": "en"}, "flavor_text": "Seed\nPokemon"}]
-    ) == "Seed Pokemon"
+    assert (
+        pokemon_business.first_english_flavor_text(
+            [
+                {"language": {"name": "pt"}, "flavor_text": "Nao"},
+                {"language": {"name": "en"}, "flavor_text": "Seed\nPokemon"},
+            ]
+        )
+        == "Seed Pokemon"
+    )
     assert pokemon_business.first_english_flavor_text(None) is None
     assert pokemon_business.stats_by_name(
         {"stats": [{"base_stat": 10, "stat": {"name": "special-attack"}}]}
@@ -576,7 +726,10 @@ def test_pokemon_business_serializers_and_stats():
     custom_page = pokemon_business.CustomLimitOffsetPage[PokemonSchema].create(
         [pokemon], LimitOffsetParams(limit=1, offset=0), total=1
     )
-    assert pokemon_business.result_list_cache_serialize(custom_page)["type"] == "custom-paginate"
+    assert (
+        pokemon_business.result_list_cache_serialize(custom_page)["type"]
+        == "custom-paginate"
+    )
     assert pokemon_business.result_cache_serialize(pokemon)["name"] == "bulbasaur"
 
 
@@ -609,7 +762,18 @@ def _pokemon_schema_with_relations(include_relations=True):
         "damage_class": "physical",
         "created_at": now,
     }
-    ability = {"id": uuid4(), "url": "url", "name": "ability", "order": 1, "created_at": now}
+    ability = {
+        "id": uuid4(),
+        "url": "url",
+        "name": "ability",
+        "order": 1,
+        "slot": 1,
+        "effect": "effect",
+        "is_hidden": False,
+        "flavor_text": "flavor",
+        "short_effect": "short",
+        "created_at": now,
+    }
     encounter = {
         "id": uuid4(),
         "url": "url",
@@ -738,8 +902,12 @@ async def test_pokemon_service_remaining_paths():
         list_pokemon=AsyncMock(
             return_value=SimpleNamespace(
                 results=[
-                    SimpleNamespace(name="skip", url="https://pokeapi.co/api/v2/pokemon/1/"),
-                    SimpleNamespace(name="create", url="https://pokeapi.co/api/v2/pokemon/2/"),
+                    SimpleNamespace(
+                        name="skip", url="https://pokeapi.co/api/v2/pokemon/1/"
+                    ),
+                    SimpleNamespace(
+                        name="create", url="https://pokeapi.co/api/v2/pokemon/2/"
+                    ),
                 ]
             )
         )
@@ -751,8 +919,12 @@ async def test_pokemon_service_remaining_paths():
         ability_service=SimpleNamespace(sync_from_resources=AsyncMock(return_value=[])),
         move_service=SimpleNamespace(sync_from_resources=AsyncMock(return_value=[])),
         image_service=SimpleNamespace(sync_from_sprites=AsyncMock(return_value=None)),
-        growth_rate_service=SimpleNamespace(sync_from_resource=AsyncMock(return_value=None)),
-        habitat_service=SimpleNamespace(sync_from_resource=AsyncMock(return_value=None)),
+        growth_rate_service=SimpleNamespace(
+            sync_from_resource=AsyncMock(return_value=None)
+        ),
+        habitat_service=SimpleNamespace(
+            sync_from_resource=AsyncMock(return_value=None)
+        ),
         shape_service=SimpleNamespace(sync_from_resource=AsyncMock(return_value=None)),
         encounter_service=SimpleNamespace(sync_from_payload=AsyncMock(return_value=[])),
     )
@@ -762,7 +934,9 @@ async def test_pokemon_service_remaining_paths():
     with pytest.raises(HTTPException):
         await service.list_all()
 
-    service.list_cache_service.get_list = AsyncMock(side_effect=RuntimeError("cache boom"))
+    service.list_cache_service.get_list = AsyncMock(
+        side_effect=RuntimeError("cache boom")
+    )
     with pytest.raises(HTTPException):
         await service.list_all_cached()
 
@@ -800,6 +974,7 @@ def test_shared_schema_and_text_language_branches():
 
     assert get_text_language([], "text").error is True
     assert get_text_language([{"language": {"name": "en"}}], "missing").error is True
+
     class EntryModel(BaseModel):
         language: dict
         version_group: dict
@@ -807,7 +982,11 @@ def test_shared_schema_and_text_language_branches():
 
     grouped = get_text_language(
         [
-            EntryModel(language={"name": "pt"}, version_group={"name": "old"}, flavor_text="fallback"),
+            EntryModel(
+                language={"name": "pt"},
+                version_group={"name": "old"},
+                flavor_text="fallback",
+            ),
             {
                 "language": {"name": "en"},
                 "version_group": {"name": "ruby-sapphire"},
@@ -818,4 +997,9 @@ def test_shared_schema_and_text_language_branches():
         group="ruby-sapphire",
     )
     assert grouped.text == "grouped"
-    assert get_text_language([[("language", {"name": "en"}), ("text", "tuple")]], "text").text == "tuple"
+    assert (
+        get_text_language(
+            [[("language", {"name": "en"}), ("text", "tuple")]], "text"
+        ).text
+        == "tuple"
+    )

@@ -52,8 +52,12 @@ ROUTE_CASES = [
 ]
 
 
-@pytest.mark.parametrize("service_factory, filter_factory, _list_func, _get_func", ROUTE_CASES)
-def test_fragment_service_factory_and_filter(service_factory, filter_factory, _list_func, _get_func):
+@pytest.mark.parametrize(
+    "service_factory, filter_factory, _list_func, _get_func", ROUTE_CASES
+)
+def test_fragment_service_factory_and_filter(
+    service_factory, filter_factory, _list_func, _get_func
+):
     service = service_factory(AsyncMock())
     page_filter = filter_factory(page=1, offset=0, limit=12, name="name", order=1)
 
@@ -64,7 +68,9 @@ def test_fragment_service_factory_and_filter(service_factory, filter_factory, _l
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("_service_factory, filter_factory, list_func, get_func", ROUTE_CASES)
+@pytest.mark.parametrize(
+    "_service_factory, filter_factory, list_func, get_func", ROUTE_CASES
+)
 async def test_fragment_route_handlers_delegate(
     _service_factory, filter_factory, list_func, get_func
 ):

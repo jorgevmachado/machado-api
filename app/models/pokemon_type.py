@@ -26,6 +26,7 @@ class PokemonType:
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     order: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     badge_url: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
     badge_icon_url: Mapped[str] = mapped_column(String, nullable=False)
     badge_shield_url: Mapped[str] = mapped_column(String, nullable=False)
     badge_legends_url: Mapped[str] = mapped_column(String, nullable=False)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
@@ -40,7 +41,13 @@ class PokemonMoveService(BaseService[PokemonMoveRepository, PokemonMove]):
             resource = entry.get("move") or entry
             url = resource.get("url")
             order = ensure_order_number(url)
-            synced.append(await self.get_or_create(order=order, url=url))
+            try:
+                synced.append(await self.get_or_create(order=order, url=url))
+            except httpx.TimeoutException:
+                logger.warning(
+                    "Timeout while syncing Pokemon move. Skipping move.",
+                    extra={"move_order": order, "move_url": url},
+                )
         return synced
 
     async def get_or_create(self, order: int, url: str | None = None) -> PokemonMove:

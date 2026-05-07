@@ -15,6 +15,7 @@ from app.infrastructure.external_api.schemas import (
     PokemonExternalSchema,
     PokemonExternalSpeciesSchema,
     PokemonExternalTypeSchema,
+    PokemonExternalMoveDamageClassSchema,
 )
 
 
@@ -97,3 +98,9 @@ class PokeApiClient:
     ) -> PokemonExternalEvolutionSchema:
         payload = await self._get(url)
         return PokemonExternalEvolutionSchema.model_validate(payload)
+
+    async def get_move_damage_class_by_url(
+        self, url: str
+    ) -> PokemonExternalMoveDamageClassSchema:
+        payload = await self._get(url)
+        return PokemonExternalMoveDamageClassSchema.model_validate(payload)

@@ -20,6 +20,7 @@ from app.infrastructure.external_api import PokeApiClient
 from app.infrastructure.external_api.schemas import NamedExternalResourceSchema
 from app.models import PokemonType, PokemonStatusEnum
 from app.shared.utils.number import ensure_order_number
+from app.shared.utils.string import get_text_language
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,14 @@ class PokemonTypeService(BaseService[PokemonTypeRepository, PokemonType]):
         if external_type is None:
             raise ValueError(f"Failed to retrieve external type for name: {name}")
 
+        move_damage_class_url = (
+            external_type.move_damage_class.url
+            if external_type.move_damage_class is not None
+            else None
+        )
+        description = await self.update_description(
+            type_class_url=move_damage_class_url
+        )
         badges = ensure_badges(external_type.sprites)
         pokemon_type_colors = ensure_colors(name)
         damage_relations = ensure_damage_relations(external_type.damage_relations)
@@ -122,6 +131,7 @@ class PokemonTypeService(BaseService[PokemonTypeRepository, PokemonType]):
                 status=status,
                 badge_url=badges.badge_url,
                 text_color=pokemon_type_colors.text_color,
+                description=description,
                 badge_icon_url=badges.badge_icon_url,
                 badge_shield_url=badges.badge_shield_url,
                 background_color=pokemon_type_colors.background_color,
@@ -166,6 +176,23 @@ class PokemonTypeService(BaseService[PokemonTypeRepository, PokemonType]):
 
         return pokemon_type
 
+    async def update_description(
+        self, type_class_url: str | None, description: str | None = None
+    ) -> str:
+        if description and description != "":
+            return description
+        if not type_class_url:
+            return ""
+        external_move_damage_class = await self.client.get_move_damage_class_by_url(
+            type_class_url
+        )
+        if external_move_damage_class:
+            description_entry = get_text_language(
+                entries=external_move_damage_class.descriptions, title="description"
+            )
+            return description_entry.text
+        return ""
+
     async def find_one(
         self,
         param: str,
@@ -173,6 +200,10 @@ class PokemonTypeService(BaseService[PokemonTypeRepository, PokemonType]):
     ):
         pokemon_type = await super().find_one(param, user_request)
         if pokemon_type.status == PokemonStatusEnum.INCOMPLETE:
+            if not pokemon_type.description or pokemon_type.description == "":
+                pokemon_type.description = await self.update_description(
+                    type_class_url=pokemon_type.url
+                )
             external_type = await self.client.get_type(pokemon_type.name)
             if external_type is None:
                 raise ValueError(

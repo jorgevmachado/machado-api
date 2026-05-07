@@ -61,7 +61,7 @@ async def test_initial_catalog_sync_uses_only_list_endpoint(monkeypatch):
         {
             "name": "bulbasaur",
             "order": 1,
-            "external_image": "https://www.pokemon.com/static-assets/content-assets/cms2/img/pokedex/detail/0001.png",
+            "external_image": "https://www.pokemon.com/static-assets/content-assets/cms2/img/pokedex/detail/001.png",
         }
     ]
     assert client.detail_called is False

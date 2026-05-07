@@ -56,6 +56,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("text_color", sa.String(), nullable=False),
+        sa.Column("description", sa.String(), nullable=False),
         sa.Column("background_color", sa.String(), nullable=False),
         sa.Column("badge_url", sa.String(), nullable=False),
         sa.Column("badge_icon_url", sa.String(), nullable=False),

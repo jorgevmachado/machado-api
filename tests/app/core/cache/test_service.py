@@ -201,14 +201,18 @@ class TestCacheServiceSetList:
 
     @staticmethod
     @pytest.mark.asyncio
-    async def test_cache_service_set_list_handles_validation_error(cache_service, monkeypatch):
+    async def test_cache_service_set_list_handles_validation_error(
+        cache_service, monkeypatch
+    ):
         key = f"{cache_service.prefix}:list:invalid"
         cache_service.cache.set_cache = AsyncMock(return_value=None)
 
         def raise_validation_error(_item):
             raise ValidationError.from_exception_data("BaseModelSchema", [])
 
-        monkeypatch.setattr(cache_service.schema_class, "model_validate", raise_validation_error)
+        monkeypatch.setattr(
+            cache_service.schema_class, "model_validate", raise_validation_error
+        )
 
         result = await cache_service.set_list(key, [object()])
 
@@ -264,7 +268,9 @@ class TestCacheServiceGetOne:
         def raise_validation_error(_payload):
             raise ValidationError.from_exception_data("BaseModelSchema", [])
 
-        monkeypatch.setattr(cache_service.schema_class, "model_validate", raise_validation_error)
+        monkeypatch.setattr(
+            cache_service.schema_class, "model_validate", raise_validation_error
+        )
 
         result = await cache_service.get_one(key)
 
@@ -307,19 +313,25 @@ class TestCacheServiceSetOne:
 
     @staticmethod
     @pytest.mark.asyncio
-    async def test_cache_service_set_one_handles_validation_error(cache_service, monkeypatch):
+    async def test_cache_service_set_one_handles_validation_error(
+        cache_service, monkeypatch
+    ):
         key = "test_cache:name:invalid"
         cache_service.cache.set_cache = AsyncMock(return_value=None)
 
         def raise_validation_error(_payload):
             raise ValidationError.from_exception_data("BaseModelSchema", [])
 
-        monkeypatch.setattr(cache_service.schema_class, "model_validate", raise_validation_error)
+        monkeypatch.setattr(
+            cache_service.schema_class, "model_validate", raise_validation_error
+        )
 
         result = await cache_service.set_one(key, MOCK_ITEM)
 
         assert result is None
-        cache_service.cache.set_cache.assert_awaited_once_with(key, None, cache_service.ttl)
+        cache_service.cache.set_cache.assert_awaited_once_with(
+            key, None, cache_service.ttl
+        )
 
     @staticmethod
     @pytest.mark.asyncio

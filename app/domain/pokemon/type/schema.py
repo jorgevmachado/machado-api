@@ -17,6 +17,7 @@ class PokemonTypeDamageSchema(BaseModel):
     status: PokemonStatusEnum | None = None
     text_color: str | None = None
     badge_url: str | None = None
+    description: str | None = None
     badge_icon_url: str | None = None
     background_color: str | None = None
     badge_shield_url: str | None = None
@@ -39,6 +40,7 @@ class PokemonTypeSchema(BaseModel):
     badge_url: str | None = None
     strengths: list[PokemonTypeDamageSchema] = []
     weaknesses: list[PokemonTypeDamageSchema] = []
+    description: str | None = None
     badge_icon_url: str | None = None
     background_color: str | None = None
     badge_shield_url: str | None = None
