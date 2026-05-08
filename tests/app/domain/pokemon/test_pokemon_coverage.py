@@ -806,6 +806,32 @@ def _pokemon_schema_with_relations(include_relations=True):
         "front_source": "front_default",
         "created_at": now,
     }
+    evolution = {
+        "id": uuid4(),
+        "hp": 2,
+        "name": "ivysaur",
+        "order": 2,
+        "images": image if include_relations else None,
+        "speed": 2,
+        "height": 2,
+        "weight": 2,
+        "status": PokemonStatusEnum.COMPLETE,
+        "attack": 2,
+        "defense": 2,
+        "is_baby": False,
+        "gender_rate": 1,
+        "is_mythical": False,
+        "is_legendary": False,
+        "capture_rate": 1,
+        "hatch_counter": 1,
+        "base_happiness": 1,
+        "external_image": "image",
+        "special_attack": 2,
+        "special_defense": 2,
+        "base_experience": 2,
+        "has_gender_differences": False,
+        "created_at": now,
+    }
     return PokemonSchema(
         id=uuid4(),
         hp=1,
@@ -824,6 +850,7 @@ def _pokemon_schema_with_relations(include_relations=True):
         is_baby=False,
         habitat=named_resource if include_relations else None,
         abilities=[ability] if include_relations else [],
+        evolutions=[evolution] if include_relations else [],
         encounters=[encounter] if include_relations else [],
         growth_rate=growth_rate if include_relations else None,
         gender_rate=1,
@@ -853,6 +880,7 @@ def test_pokemon_type_and_pokemon_schema_serializers():
     assert serialized["growth_rate"]["formula"] == "x"
     assert serialized["habitat"]["name"] == "resource"
     assert serialized["shape"]["name"] == "resource"
+    assert serialized["evolutions"][0]["name"] == "ivysaur"
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-from typing import Any, Optional, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -7,16 +7,13 @@ class Message(BaseModel):
     message: str
 
 
-TFilterPage = TypeVar("TFilterPage", bound="FilterPage")
-
-
-class FilterPage(BaseModel):
+class FilterPage[TFilterPage](BaseModel):
     model_config = ConfigDict()
 
-    page: Optional[int] = Field(None, ge=0)
-    offset: Optional[int] = Field(None, ge=0)
-    limit: Optional[int] = Field(None, ge=1)
-    order_by: Optional[str] = Field(None)
+    page: int | None = Field(None, ge=0)
+    offset: int | None = Field(None, ge=0)
+    limit: int | None = Field(None, ge=1)
+    order_by: str | None = Field(None)
 
     @classmethod
     def _build_dynamic(cls: type[TFilterPage], payload: dict[str, Any]) -> TFilterPage:

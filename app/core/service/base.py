@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Annotated, Generic, Type, TypeVar
+from typing import Annotated
 
 from fastapi import HTTPException, Query
 from pydantic import BaseModel
@@ -11,19 +11,18 @@ from app.core.pagination.pagination import exception_pagination
 from app.shared.schemas import FilterPage
 from app.shared.utils.string import is_valid_uuid
 
-RepositoryT = TypeVar("RepositoryT")
-ModelT = TypeVar("ModelT")
-SchemaT = TypeVar("SchemaT", bound=BaseModel)
-UpdateSchemaT = TypeVar("UpdateSchemaT")
-
-
-class BaseService(Generic[RepositoryT, ModelT]):
+class BaseService[
+    RepositoryT,
+    ModelT,
+    SchemaT: BaseModel = BaseModel,
+    UpdateSchemaT: BaseModel = BaseModel,
+]:
     def __init__(
         self,
         alias: str,
         repository: RepositoryT,
         logger_params: LoggingParams,
-        schema_class: Type[SchemaT],
+        schema_class: type[SchemaT],
         cache_prefix: str | None = None,
     ):
         prefix = cache_prefix or alias.replace(" ", "_").lower()

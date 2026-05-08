@@ -15,7 +15,7 @@ init:
 	make migrate
 
 test-app:
-	poetry run pytest -x --cov=app -vv
+	poetry run pytest -x --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=100 -vv
 test-coverage:
 	poetry run coverage html
 test:
@@ -48,4 +48,3 @@ rollback-migration:
 
 migrate:
 	poetry run alembic upgrade head
-

@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Annotated, Any
 
 from fastapi import Depends, Query
 from fastapi_pagination.ext.sqlalchemy import paginate
@@ -10,11 +10,10 @@ from app.core.pagination import CustomLimitOffsetPage, is_paginate
 from app.core.pagination.pagination import get_limit_offset_params
 from app.shared.schemas import FilterPage
 
-ModelT = TypeVar("ModelT")
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
-class BaseRepository(Generic[ModelT]):
+class BaseRepository[ModelT]:
     model: type[ModelT]
     relations: tuple[Any, ...] = ()
     default_order_by: str | None = None
