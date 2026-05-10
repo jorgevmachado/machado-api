@@ -179,6 +179,25 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("order"),
     )
+
+    op.create_table(
+        "pokemon_encounters",
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("url", sa.String(), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("order", sa.Integer(), nullable=False),
+        sa.Column("chance", sa.Integer(), nullable=False),
+        sa.Column("method", sa.String(), nullable=False),
+        sa.Column("version", sa.String(), nullable=False),
+        sa.Column("min_level", sa.Integer(), nullable=False),
+        sa.Column("max_level", sa.Integer(), nullable=False),
+        sa.Column("condition", sa.String(), nullable=False),
+        sa.Column("max_chance", sa.Integer(), nullable=True),
+        *_timestamps(),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("order"),
+        sa.UniqueConstraint("name"),
+    )
     op.create_table(
         "pokemons",
         sa.Column("name", sa.String(), nullable=False),
@@ -255,32 +274,22 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("pokemon_id", "ability_id"),
     )
     op.create_table(
+        "pokemon_encounter_links",
+        sa.Column("pokemon_id", sa.UUID(), nullable=False),
+        sa.Column("encounter_id", sa.UUID(), nullable=False),
+        sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["encounter_id"], ["pokemon_encounters.id"], ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("pokemon_id", "encounter_id"),
+    )
+    op.create_table(
         "pokemon_evolution_links",
         sa.Column("pokemon_id", sa.UUID(), nullable=False),
         sa.Column("evolution_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["evolution_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pokemon_id", "evolution_id"),
-    )
-    op.create_table(
-        "pokemon_encounters",
-        sa.Column("id", sa.UUID(), nullable=False),
-        sa.Column("url", sa.String(), nullable=False),
-        sa.Column("name", sa.String(), nullable=False),
-        sa.Column("order", sa.Integer(), nullable=False),
-        sa.Column("chance", sa.Integer(), nullable=False),
-        sa.Column("method", sa.String(), nullable=False),
-        sa.Column("version", sa.String(), nullable=False),
-        sa.Column("min_level", sa.Integer(), nullable=False),
-        sa.Column("max_level", sa.Integer(), nullable=False),
-        sa.Column("condition", sa.String(), nullable=False),
-        sa.Column("max_chance", sa.Integer(), nullable=True),
-        sa.Column("pokemon_id", sa.UUID(), nullable=False),
-        *_timestamps(),
-        sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("order"),
-        sa.UniqueConstraint("name"),
     )
 
 
@@ -291,16 +300,15 @@ def downgrade() -> None:
             ("pokemons", "habitat_id"),
             ("pokemons", "shape_id"),
             ("pokemon_images", "pokemon_id"),
-            ("pokemon_encounters", "pokemon_id"),
         )
     ):
         op.drop_index(f"ix_{table}_{column}", table_name=table)
-    op.drop_table("pokemon_encounters")
     op.drop_table("pokemon_images")
     op.drop_table("pokemon_evolution_links")
     op.drop_table("pokemon_ability_links")
     op.drop_table("pokemon_move_links")
     op.drop_table("pokemon_type_links")
+    op.drop_table("pokemon_encounter_links")
     op.drop_table("pokemons")
     op.drop_table("pokemon_shapes")
     op.drop_table("pokemon_habitats")
@@ -308,4 +316,5 @@ def downgrade() -> None:
     op.drop_table("pokemon_abilities")
     op.drop_table("pokemon_moves")
     op.drop_table("pokemon_types")
+    op.drop_table("pokemon_encounters")
     op.execute("DROP TYPE IF EXISTS pokemonstatusenum")

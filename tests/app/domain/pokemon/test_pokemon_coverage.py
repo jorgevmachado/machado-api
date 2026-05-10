@@ -271,10 +271,9 @@ async def test_growth_rate_service_paths():
 
 @pytest.mark.asyncio
 async def test_encounter_service_success_and_validation_paths():
-    pokemon_id = uuid4()
     existing = SimpleNamespace(order=1)
     service = PokemonEncounterService(_repo(find_by=existing), client=SimpleNamespace())
-    assert await service.get_or_create(pokemon_id=pokemon_id, order=1) is existing
+    assert await service.get_or_create(order=1) is existing
 
     service = PokemonEncounterService(_repo(find_by=None), client=SimpleNamespace())
     valid_entry = {
@@ -298,7 +297,7 @@ async def test_encounter_service_success_and_validation_paths():
             }
         ],
     }
-    result = await service.sync_from_payload(pokemon_id, [valid_entry])
+    result = await service.sync_from_payload([valid_entry])
     assert result[0].condition == "morning"
 
     invalid_cases = [
@@ -363,7 +362,6 @@ async def test_encounter_service_success_and_validation_paths():
     for entry, message in invalid_cases:
         with pytest.raises(ValueError, match=message):
             await service.get_or_create(
-                pokemon_id=pokemon_id,
                 order=99,
                 url=entry.get("url"),
                 name=entry.get("name"),
@@ -520,9 +518,9 @@ async def test_type_service_update_description_existing_and_external_description
     assert await service.update_description(None, description="Already set") == (
         "Already set"
     )
-    assert await service.update_description("https://pokeapi.co/api/v2/move-damage-class/2/") == (
-        "Description"
-    )
+    assert await service.update_description(
+        "https://pokeapi.co/api/v2/move-damage-class/2/"
+    ) == ("Description")
 
 
 @pytest.mark.asyncio
@@ -643,8 +641,10 @@ def test_image_schema_serialization_branches():
     assert schema.serialize()["front_image"] == "front"
     assert PokemonImageSchema._serialize_images('{"a","b"}') == ["a", "b"]
     assert PokemonImageSchema._serialize_images("{}") == []
+    assert PokemonImageSchema._serialize_images('{"image":"a"}') == []
     assert PokemonImageSchema._serialize_images("[") == ["["]
     assert PokemonImageSchema._serialize_images("[bad]") == []
+    assert PokemonImageSchema._serialize_images("   ") == []
     assert PokemonImageSchema._serialize_images("single") == ["single"]
     assert PokemonImageSchema._serialize_images(None) == []
     assert PokemonImageSchema._serialize_images(["a", "", 1]) == ["a", "1"]

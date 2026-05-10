@@ -141,7 +141,11 @@ class Pokemon:
         repr=False,
     )
     encounters: Mapped[list["PokemonEncounter"]] = relationship(
-        lazy=default_lazy, default_factory=list, init=False, repr=False
+        secondary="pokemon_encounter_links",
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
     )
 
     evolutions: Mapped[list["Pokemon"]] = relationship(

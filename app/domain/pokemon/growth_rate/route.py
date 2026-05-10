@@ -28,6 +28,7 @@ def get_pokemon_growth_rate_filter(
     limit: int | None = 12,
     name: str | None = None,
     order: int | None = None,
+    clean_cache: bool = False,
 ) -> FilterPage:
     return FilterPage.build(
         page=page,
@@ -35,6 +36,7 @@ def get_pokemon_growth_rate_filter(
         limit=limit,
         name=name,
         order=order,
+        clean_cache=clean_cache,
     )
 
 

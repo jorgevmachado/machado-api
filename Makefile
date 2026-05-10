@@ -16,6 +16,7 @@ init:
 
 test-app:
 	poetry run pytest -x --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=100 -vv
+	python3 scripts/normalize_coverage_for_sonar.py
 test-coverage:
 	poetry run coverage html
 test:

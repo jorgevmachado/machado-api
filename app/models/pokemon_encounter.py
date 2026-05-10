@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import default_lazy, table_registry
@@ -32,10 +32,6 @@ class PokemonEncounter:
     condition: Mapped[str] = mapped_column(String, nullable=False)
     max_chance: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    pokemon_id: Mapped[UUID] = mapped_column(
-        ForeignKey("pokemons.id", ondelete="CASCADE"), nullable=False
-    )
-
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default_factory=utcnow, init=False
     )
@@ -46,4 +42,10 @@ class PokemonEncounter:
         DateTime(timezone=True), nullable=True, default=None, init=False
     )
 
-    pokemon: Mapped["Pokemon"] = relationship(lazy=default_lazy, init=False, repr=False)
+    pokemons: Mapped[list["Pokemon"]] = relationship(
+        secondary="pokemon_encounter_links",
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+    )

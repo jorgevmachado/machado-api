@@ -14,6 +14,7 @@ class FilterPage[TFilterPage](BaseModel):
     offset: int | None = Field(None, ge=0)
     limit: int | None = Field(None, ge=1)
     order_by: str | None = Field(None)
+    clean_cache: bool | None = Field(None)
 
     @classmethod
     def _build_dynamic(cls: type[TFilterPage], payload: dict[str, Any]) -> TFilterPage:

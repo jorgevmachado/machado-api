@@ -11,6 +11,7 @@ from app.core.pagination.pagination import exception_pagination
 from app.shared.schemas import FilterPage
 from app.shared.utils.string import is_valid_uuid
 
+
 class BaseService[
     RepositoryT,
     ModelT,
@@ -71,6 +72,11 @@ class BaseService[
         trainer_id: str | None = None,
     ):
         filter_page = FilterPage.build(page_filter, trainer_id=trainer_id)
+        clean_cache = page_filter.clean_cache if page_filter else False
+        if clean_cache:
+            await self.cache_service.delete_domain()
+        if page_filter:
+            page_filter.clean_cache = None
         key = self.cache_service.build_key_list(page_filter=filter_page)
         cached = await self.cache_service.get_list(key)
         if cached:

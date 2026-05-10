@@ -51,6 +51,7 @@ def get_pokemon_filter(
     order: int | None = None,
     status: str | None = None,
     type: str | None = None,  # noqa: A002
+    clean_cache: bool = False,
 ) -> FilterPage:
     return FilterPage.build(
         page=page,
@@ -60,6 +61,7 @@ def get_pokemon_filter(
         order=order,
         status=status,
         type=type,
+        clean_cache=clean_cache,
     )
 
 

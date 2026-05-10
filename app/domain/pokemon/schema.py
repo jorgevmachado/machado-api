@@ -15,6 +15,7 @@ from app.domain.pokemon.shape.schema import PokemonShapeSchema
 from app.domain.pokemon.type.schema import PokemonTypeSchema
 from app.models.enums import PokemonStatusEnum
 
+
 class PokemonEvolutionSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +48,7 @@ class PokemonEvolutionSchema(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
+
 
 class PokemonSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -89,53 +91,57 @@ class PokemonSchema(BaseModel):
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
 
+    @staticmethod
+    def _serialize_collection(
+        serialized: dict,
+        key: str,
+        schema: type[BaseModel],
+        *,
+        use_serialize: bool = False,
+    ) -> None:
+        values = serialized.get(key)
+        if not values:
+            return
+
+        serialized[key] = [
+            schema.model_validate(value).serialize()
+            if use_serialize
+            else schema.model_validate(value).model_dump(mode="json")
+            for value in values
+        ]
+
+    @staticmethod
+    def _serialize_nested_value(
+        serialized: dict,
+        key: str,
+        schema: type[BaseModel],
+        *,
+        use_serialize: bool = False,
+    ) -> None:
+        value = serialized.get(key)
+        if not value:
+            return
+
+        validated = schema.model_validate(value)
+        serialized[key] = (
+            validated.serialize()
+            if use_serialize
+            else validated.model_dump(mode="json")
+        )
+
     def serialize(self) -> dict:
         serialized = self.model_dump(mode="json")
-        if "types" in serialized and serialized["types"]:
-            serialized["types"] = [
-                PokemonTypeSchema.model_validate(serialized_type).serialize()
-                for serialized_type in serialized["types"]
-            ]
-        if "moves" in serialized and serialized["moves"]:
-            serialized["moves"] = [
-                PokemonMoveSchema.model_validate(serialized_move).model_dump(
-                    mode="json"
-                )
-                for serialized_move in serialized["moves"]
-            ]
-        if "abilities" in serialized and serialized["abilities"]:
-            serialized["abilities"] = [
-                PokemonAbilitySchema.model_validate(serialized_ability).model_dump(
-                    mode="json"
-                )
-                for serialized_ability in serialized["abilities"]
-            ]
-        if "encounters" in serialized and serialized["encounters"]:
-            serialized["encounters"] = [
-                PokemonEncounterSchema.model_validate(serialized_encounter).model_dump(
-                    mode="json"
-                )
-                for serialized_encounter in serialized["encounters"]
-            ]
-        if "images" in serialized and serialized["images"]:
-            serialized["images"] = PokemonImageSchema.model_validate(
-                serialized["images"]
-            ).serialize()
-        if "growth_rate" in serialized and serialized["growth_rate"]:
-            serialized["growth_rate"] = PokemonGrowthRateSchema.model_validate(
-                serialized["growth_rate"]
-            ).model_dump(mode="json")
-        if "habitat" in serialized and serialized["habitat"]:
-            serialized["habitat"] = PokemonHabitatSchema.model_validate(
-                serialized["habitat"]
-            ).model_dump(mode="json")
-        if "shape" in serialized and serialized["shape"]:
-            serialized["shape"] = PokemonShapeSchema.model_validate(
-                serialized["shape"]
-            ).model_dump(mode="json")
-        if 'evolutions' in serialized and serialized['evolutions']:
-            serialized['evolutions'] = [
-                PokemonEvolutionSchema.model_validate(evo).model_dump(mode='json')
-                for evo in serialized['evolutions']
-            ]
+        self._serialize_collection(
+            serialized, "types", PokemonTypeSchema, use_serialize=True
+        )
+        self._serialize_collection(serialized, "moves", PokemonMoveSchema)
+        self._serialize_collection(serialized, "abilities", PokemonAbilitySchema)
+        self._serialize_collection(serialized, "encounters", PokemonEncounterSchema)
+        self._serialize_collection(serialized, "evolutions", PokemonEvolutionSchema)
+        self._serialize_nested_value(
+            serialized, "images", PokemonImageSchema, use_serialize=True
+        )
+        self._serialize_nested_value(serialized, "growth_rate", PokemonGrowthRateSchema)
+        self._serialize_nested_value(serialized, "habitat", PokemonHabitatSchema)
+        self._serialize_nested_value(serialized, "shape", PokemonShapeSchema)
         return serialized

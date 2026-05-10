@@ -155,6 +155,12 @@ class PokemonService(BaseService[PokemonRepository, Pokemon]):
         trainer_id: str | None = None,
     ):
         try:
+            clean_cache = page_filter.clean_cache if page_filter else False
+
+            if clean_cache:
+                await self.cache_service.delete_domain()
+            if page_filter:
+                page_filter.clean_cache = None
             key = self._list_key(page_filter)
             cached = await self.list_cache_service.get_list(key)
             if cached:
@@ -229,6 +235,11 @@ class PokemonService(BaseService[PokemonRepository, Pokemon]):
             await self.ability_service.sync_from_resources(payload.get("abilities", []))
         )
 
+        pokemon.encounters.clear()
+        pokemon.encounters.extend(
+            await self.encounter_service.sync_from_payload(encounters)
+        )
+
         growth_rate = await self.growth_rate_service.sync_from_resource(
             species.get("growth_rate")
         )
@@ -245,7 +256,6 @@ class PokemonService(BaseService[PokemonRepository, Pokemon]):
         )
         pokemon.images_id = images.id if images else None
 
-        await self.encounter_service.sync_from_payload(pokemon.id, encounters)
         if with_evolutions:
             evolutions = await self._sync_evolution_chain(pokemon)
             pokemon.evolutions = evolutions

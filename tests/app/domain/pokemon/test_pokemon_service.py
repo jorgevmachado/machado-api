@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from app.domain.pokemon.service import PokemonService
 from app.models.enums import PokemonStatusEnum
+from app.shared.schemas import FilterPage
 
 
 class FakeRepository:
@@ -144,16 +145,20 @@ async def test_list_all_returns_cache_hit_without_repository_query():
     )
     service = build_service(repository)
     cached = SimpleNamespace(items=[])
+    page_filter = FilterPage(clean_cache=True)
+    service.cache_service.delete_domain = AsyncMock()
     service.list_cache_service = SimpleNamespace(
         get_list=AsyncMock(return_value=cached),
         set_list=AsyncMock(),
         cache=SimpleNamespace(build_key=lambda *_args: "pokemon:list:key"),
     )
 
-    result = await service.list_all_cached()
+    result = await service.list_all_cached(page_filter=page_filter)
 
     assert result is cached
+    assert page_filter.clean_cache is None
     repository.list_all.assert_not_awaited()
+    service.cache_service.delete_domain.assert_awaited_once()
     service.list_cache_service.set_list.assert_not_awaited()
 
 

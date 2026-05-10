@@ -146,15 +146,15 @@ async def test_pokeapi_client_remaining_methods(monkeypatch):
     assert (await client.get_ability(1)).name == "overgrow"
     assert (await client.get_growth_rate(1)).name == "medium"
     assert (
-               await client.get_evolution_chain_by_url(
-                   "https://pokeapi.co/api/v2/evolution-chain/1"
-               )
-           ).id == 1
+        await client.get_evolution_chain_by_url(
+            "https://pokeapi.co/api/v2/evolution-chain/1"
+        )
+    ).id == 1
     assert (
-               await client.get_move_damage_class_by_url(
-                   "https://pokeapi.co/api/v2/move-damage-class/1"
-               )
-           ).id == 1
+        await client.get_move_damage_class_by_url(
+            "https://pokeapi.co/api/v2/move-damage-class/1"
+        )
+    ).id == 1
 
 
 @pytest.mark.asyncio

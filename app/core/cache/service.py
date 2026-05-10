@@ -224,6 +224,7 @@ class CacheService:
 
     async def delete_domain(self) -> None:
         pattern = f"{self.prefix}*"
+        print("# => pattern => ", pattern)
         await self.cache.delete_pattern(pattern)
         log_service_success(
             self.logger_params,

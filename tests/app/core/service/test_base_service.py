@@ -90,14 +90,21 @@ class TestBaseServiceListAllCached:
             BaseModelSchema(id="1", name="item1", value=1),
             BaseModelSchema(id="2", name="item2", value=2),
         ]
+        page_filter = FilterPage(clean_cache=True)
+        base_service.cache_service.delete_domain = AsyncMock()
         base_service.cache_service.build_key_list = AsyncMock(
             return_value="test_service:list"
         )
         base_service.cache_service.get_list = AsyncMock(return_value=values)
 
-        result = await base_service.list_all_cached(user_request="user1")
+        result = await base_service.list_all_cached(
+            page_filter=page_filter,
+            user_request="user1",
+        )
         assert isinstance(result, list)
         assert len(result) == len(values)
+        assert page_filter.clean_cache is None
+        base_service.cache_service.delete_domain.assert_awaited_once()
 
     @staticmethod
     @pytest.mark.asyncio

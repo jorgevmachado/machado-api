@@ -202,20 +202,12 @@ class BaseRepository[ModelT]:
             if value is None:
                 continue
 
-            path_tokens = field.split("__") if "__" in field else [field]
-            predicate = self._build_relation_predicate(
-                relation_model, path_tokens, value
+            predicate = self._build_filter_predicate(
+                relation_model=relation_model,
+                field=field,
+                value=value,
+                valid_columns=valid_columns,
             )
-
-            if predicate is None and len(path_tokens) == 1:
-                # Shorthand: type -> pokemon.types.name
-                plural_path = [f"{path_tokens[0]}s", "name"]
-                predicate = self._build_relation_predicate(
-                    relation_model, plural_path, value
-                )
-
-            if predicate is None and field in valid_columns:
-                predicate = getattr(relation_model, field) == value
 
             if predicate is not None:
                 predicates.append(predicate)
@@ -229,6 +221,32 @@ class BaseRepository[ModelT]:
             return query.where(relation_attr.any(combined_predicate))
 
         return query.where(relation_attr.has(combined_predicate))
+
+    def _build_filter_predicate(
+        self,
+        relation_model,
+        field: str,
+        value: Any,
+        valid_columns: set[str],
+    ):
+        path_tokens = field.split("__") if "__" in field else [field]
+        predicate = self._build_relation_predicate(relation_model, path_tokens, value)
+
+        if predicate is not None:
+            return predicate
+
+        if len(path_tokens) == 1:
+            plural_path = [f"{path_tokens[0]}s", "name"]
+            predicate = self._build_relation_predicate(
+                relation_model, plural_path, value
+            )
+            if predicate is not None:
+                return predicate
+
+        if field not in valid_columns:
+            return None
+
+        return getattr(relation_model, field) == value
 
     async def total(self):
         query = select(func.count()).select_from(self.model)
@@ -256,27 +274,9 @@ class BaseRepository[ModelT]:
             query = query.options(option)
 
         if page_filter is not None:
-            raw_filters = page_filter.model_dump(exclude_none=True)
-
-            raw_filters.pop("offset", None)
-            raw_filters.pop("limit", None)
-            raw_filters.pop("page", None)
-            raw_filters.pop("order_by", None)
-
+            raw_filters = self._prepare_raw_filters(page_filter)
             relations_filters = self._extract_relations_filters(raw_filters, relation)
-
-            valid_columns = set(self.model.__mapper__.columns.keys())
-            filters = {
-                k: v
-                for k, v in raw_filters.items()
-                if k in valid_columns and v is not None
-            }
-
-            if filters:
-                conditions = [
-                    getattr(self.model, key) == value for key, value in filters.items()
-                ]
-                query = query.where(*conditions)
+            query = self._apply_main_filters(query, raw_filters)
             query = self._apply_relations_filters(query, relations_filters, relation)
 
         query = self._apply_order_by(query, page_filter)
@@ -318,6 +318,31 @@ class BaseRepository[ModelT]:
             )
         result = await self.session.scalars(query)
         return result.all()
+
+    @staticmethod
+    def _prepare_raw_filters(page_filter: FilterPage) -> dict[str, Any]:
+        raw_filters = page_filter.model_dump(exclude_none=True)
+        raw_filters.pop("offset", None)
+        raw_filters.pop("limit", None)
+        raw_filters.pop("page", None)
+        raw_filters.pop("order_by", None)
+        return raw_filters
+
+    def _apply_main_filters(self, query, raw_filters: dict[str, Any]):
+        valid_columns = set(self.model.__mapper__.columns.keys())
+        filters = {
+            key: value
+            for key, value in raw_filters.items()
+            if key in valid_columns and value is not None
+        }
+
+        if not filters:
+            return query
+
+        conditions = [
+            getattr(self.model, key) == value for key, value in filters.items()
+        ]
+        return query.where(*conditions)
 
     async def find_by(self, **kwargs) -> ModelT | None:
         query = select(self.model)

@@ -3,6 +3,7 @@ from app.models.pokemon import Pokemon
 from app.models.pokemon_ability import PokemonAbility
 from app.models.pokemon_ability_link import PokemonAbilityLink
 from app.models.pokemon_encounter import PokemonEncounter
+from app.models.pokemon_encounter_link import PokemonEncounterLink
 from app.models.pokemon_growth_rate import PokemonGrowthRate
 from app.models.pokemon_habitat import PokemonHabitat
 from app.models.pokemon_image import PokemonImage
@@ -23,6 +24,7 @@ __all__ = [
     "PokemonAbility",
     "PokemonAbilityLink",
     "PokemonEncounter",
+    "PokemonEncounterLink",
     "PokemonGrowthRate",
     "PokemonHabitat",
     "PokemonImage",

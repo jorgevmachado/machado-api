@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,9 +40,7 @@ class PokemonEncounterService(
             client,
         )
 
-    async def sync_from_payload(
-        self, pokemon_id: UUID, resources: list[dict]
-    ) -> list[PokemonEncounter]:
+    async def sync_from_payload(self, resources: list[dict]) -> list[PokemonEncounter]:
         synced: list[PokemonEncounter] = []
         for entry in resources:
             resource = entry.get("location_area") or entry
@@ -51,21 +48,18 @@ class PokemonEncounterService(
             name = resource.get("name")
             order = ensure_order_number(url)
             synced.append(
-                await self.get_or_create(
-                    pokemon_id=pokemon_id, order=order, url=url, name=name, entry=entry
-                )
+                await self.get_or_create(order=order, url=url, name=name, entry=entry)
             )
         return synced
 
     async def get_or_create(
         self,
-        pokemon_id: UUID,
         order: int,
         url: str | None = None,
         name: str | None = None,
         entry: dict | None = None,
     ) -> PokemonEncounter:
-        entity = await self.repository.find_by(pokemon_id=pokemon_id, order=order)
+        entity = await self.repository.find_by(order=order)
         if entity:
             return entity
 
@@ -140,6 +134,5 @@ class PokemonEncounterService(
                 max_level=max_level,
                 condition=condition_name,
                 max_chance=max_chance,
-                pokemon_id=pokemon_id,
             )
         )
