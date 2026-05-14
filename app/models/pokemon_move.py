@@ -11,6 +11,7 @@ from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
+    from app.models.my_pokemon_move import MyPokemonMove
     from app.models.pokemon import Pokemon
 
 
@@ -53,4 +54,11 @@ class PokemonMove:
         default_factory=list,
         init=False,
         repr=False,
+    )
+    my_pokemon_moves: Mapped[list["MyPokemonMove"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="pokemon_move",
     )

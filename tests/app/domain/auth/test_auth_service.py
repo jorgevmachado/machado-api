@@ -90,7 +90,7 @@ class TestAuthService:
     async def test_register_rejects_existing_email():
         repository = AsyncMock()
         repository.get_by_email.return_value = object()
-        service = AuthService(repository=repository, trainer_repository=AsyncMock())
+        service = AuthService(repository=repository, trainer_service=AsyncMock())
 
         with pytest.raises(HTTPException) as exc_info:
             await service.register(build_register_schema())
@@ -104,7 +104,7 @@ class TestAuthService:
         repository = AsyncMock()
         repository.get_by_email.return_value = None
         repository.get_by_username.return_value = object()
-        service = AuthService(repository=repository, trainer_repository=AsyncMock())
+        service = AuthService(repository=repository, trainer_service=AsyncMock())
 
         with pytest.raises(HTTPException) as exc_info:
             await service.register(build_register_schema())
@@ -123,7 +123,7 @@ class TestAuthService:
         monkeypatch.setattr(
             "app.domain.auth.service.get_password_hash", lambda _: "hashed-password"
         )
-        service = AuthService(repository=repository, trainer_repository=AsyncMock())
+        service = AuthService(repository=repository, trainer_service=AsyncMock())
 
         result = await service.register(build_register_schema())
 
@@ -138,7 +138,7 @@ class TestAuthService:
     async def test_login_rejects_missing_user():
         repository = AsyncMock()
         repository.get_by_email_or_username.return_value = None
-        service = AuthService(repository=repository, trainer_repository=AsyncMock())
+        service = AuthService(repository=repository, trainer_service=AsyncMock())
 
         with pytest.raises(HTTPException) as exc_info:
             await service.login(LoginSchema(credential="ash", password="pikachu123"))
@@ -153,7 +153,7 @@ class TestAuthService:
         repository = AsyncMock()
         repository.get_by_email_or_username.return_value = user
         monkeypatch.setattr("app.domain.auth.service.verify_password", lambda *_: False)
-        service = AuthService(repository=repository, trainer_repository=AsyncMock())
+        service = AuthService(repository=repository, trainer_service=AsyncMock())
 
         with pytest.raises(HTTPException) as exc_info:
             await service.login(LoginSchema(credential="ash", password="bad-password"))
@@ -172,7 +172,7 @@ class TestAuthService:
             "app.domain.auth.service.create_access_token",
             lambda payload: f"token-{payload['sub']}",
         )
-        service = AuthService(repository=repository, trainer_repository=AsyncMock())
+        service = AuthService(repository=repository, trainer_service=AsyncMock())
 
         result = await service.login(
             LoginSchema(credential="ash", password="pikachu123")
@@ -195,12 +195,17 @@ class TestAuthService:
             status=StatusEnum.ACTIVE,
             created_at=datetime.now(timezone.utc),
         )
-        trainer_repository = AsyncMock()
-        service = AuthService(
-            repository=AsyncMock(), trainer_repository=trainer_repository
+        trainer_service = AsyncMock()
+        trainer_service.get_by_user_id.return_value = SimpleNamespace(
+            id=uuid4(),
+            user_id=user_id,
+            pokeballs=1,
+            capture_rate=75,
+            created_at=datetime.now(timezone.utc),
         )
+        service = AuthService(repository=AsyncMock(), trainer_service=trainer_service)
 
         result = await service.me(current_user)
 
-        trainer_repository.get_by_user_id.assert_awaited_once_with(user_id)
+        trainer_service.get_by_user_id.assert_awaited_once_with(user_id)
         assert result.id == user_id

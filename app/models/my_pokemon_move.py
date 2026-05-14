@@ -12,15 +12,21 @@ from app.models.common import utcnow
 
 if TYPE_CHECKING:
     from app.models.my_pokemon import MyPokemon
+    from app.models.pokemon_move import PokemonMove
 
 
 @table_registry.mapped_as_dataclass
-class Trainer:
-    __tablename__ = "trainers"
+class MyPokemonMove:
+    __tablename__ = "my_pokemon_moves"
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    pokeballs: Mapped[int] = mapped_column(Integer, nullable=False)
-    capture_rate: Mapped[int] = mapped_column(Integer, nullable=False)
+    my_pokemon_id: Mapped[UUID] = mapped_column(
+        ForeignKey("my_pokemons.id"), nullable=False
+    )
+    pokemon_move_id: Mapped[UUID] = mapped_column(
+        ForeignKey("pokemon_moves.id"), nullable=False
+    )
+    pp: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_pp: Mapped[int] = mapped_column(Integer, nullable=False)
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True, default_factory=uuid4, init=False
@@ -35,10 +41,13 @@ class Trainer:
         DateTime(timezone=True), nullable=True, default=None, init=False
     )
 
-    my_pokemons: Mapped[list["MyPokemon"]] = relationship(
+    my_pokemon: Mapped["MyPokemon"] = relationship(
         lazy=default_lazy,
-        default_factory=list,
         init=False,
-        repr=False,
-        back_populates="trainer",
+        back_populates="moves",
+    )
+    pokemon_move: Mapped["PokemonMove"] = relationship(
+        lazy=default_lazy,
+        init=False,
+        back_populates="my_pokemon_moves",
     )

@@ -20,6 +20,7 @@ from app.models.common import utcnow
 from app.models.enums import PokemonStatusEnum
 
 if TYPE_CHECKING:
+    from app.models.my_pokemon import MyPokemon
     from app.models.pokemon_ability import PokemonAbility
     from app.models.pokemon_encounter import PokemonEncounter
     from app.models.pokemon_growth_rate import PokemonGrowthRate
@@ -155,4 +156,11 @@ class Pokemon:
         secondaryjoin="Pokemon.id == pokemon_evolution_links.c.evolution_id",
         init=False,
         default_factory=list,
+    )
+    my_pokemons: Mapped[list["MyPokemon"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="pokemon",
     )

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from uuid import UUID
 
 from fastapi import HTTPException
 
@@ -15,6 +14,7 @@ from app.domain.auth.schema import (
     RegisterSchema,
 )
 from app.domain.auth.repository import UserRepository
+from app.domain.trainer.service import TrainerService
 from app.models.enums import StatusEnum
 from app.models.user import User
 
@@ -25,10 +25,13 @@ class AuthService:
     def __init__(
         self,
         repository: UserRepository,
-        trainer_repository=None,
+        trainer_service: TrainerService | None = None,
     ) -> None:
         self.repository = repository
-        self.trainer_repository = trainer_repository
+        session = repository.session
+        self.trainer_service = trainer_service or TrainerService.from_session(
+            session
+        )
 
     async def register(self, data: RegisterSchema) -> User:
         try:
@@ -93,19 +96,14 @@ class AuthService:
             )
 
     async def me(self, current_user: User) -> AuthResponseSchema:
-        trainer = None
-        if self.trainer_repository:
-            trainer = await self.trainer_repository.get_by_user_id(current_user.id)
-            if trainer is not None and not isinstance(
-                getattr(trainer, "id", None), UUID
-            ):
-                trainer = None
+        trainer = await self.trainer_service.get_by_user_id(current_user.id)
 
         return AuthResponseSchema(
             id=current_user.id,
             name=current_user.name,
             email=current_user.email,
             status=current_user.status,
+            role=current_user.role,
             username=current_user.username,
             created_at=current_user.created_at,
             updated_at=getattr(current_user, "updated_at", None),

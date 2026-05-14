@@ -3,7 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
-from app.models.enums import GenderEnum, StatusEnum
+from app.domain.trainer.schema import TrainerSchema
+from app.models.enums import GenderEnum, RoleEnum, StatusEnum
 
 
 class RegisterSchema(BaseModel):
@@ -42,19 +43,6 @@ class LoginResponseSchema(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-
-class TrainerResponseSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    user_id: UUID
-    pokeballs: int
-    capture_rate: int
-    created_at: datetime
-    updated_at: datetime | None = None
-    deleted_at: datetime | None = None
-
-
 class AuthResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -62,6 +50,7 @@ class AuthResponseSchema(BaseModel):
     name: str
     email: str
     status: StatusEnum
+    role: RoleEnum
     username: str
     created_at: datetime
     updated_at: datetime | None = None
@@ -70,4 +59,4 @@ class AuthResponseSchema(BaseModel):
     authentication_success: int | None = None
     authentication_failures: int | None = None
     last_authentication_at: datetime | None = None
-    trainer: TrainerResponseSchema | None = None
+    trainer: TrainerSchema | None = None

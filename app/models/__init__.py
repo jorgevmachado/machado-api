@@ -1,4 +1,6 @@
 from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
+from app.models.my_pokemon import MyPokemon
+from app.models.my_pokemon_move import MyPokemonMove
 from app.models.pokemon import Pokemon
 from app.models.pokemon_ability import PokemonAbility
 from app.models.pokemon_ability_link import PokemonAbilityLink
@@ -20,6 +22,8 @@ from app.models.user import User
 
 __all__ = [
     "GenderEnum",
+    "MyPokemon",
+    "MyPokemonMove",
     "Pokemon",
     "PokemonAbility",
     "PokemonAbilityLink",
