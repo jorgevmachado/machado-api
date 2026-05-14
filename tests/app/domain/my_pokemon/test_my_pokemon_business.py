@@ -1,12 +1,11 @@
 from types import SimpleNamespace
 
-
 from app.domain.my_pokemon.business import (
-    build_initial_attributes,
     build_unique_owned_name,
     resolve_effective_nickname,
     select_initial_moves,
 )
+from app.domain.progression.business import build_initial_attributes
 
 
 def test_resolve_effective_nickname_falls_back_to_base_name():
@@ -46,7 +45,7 @@ def test_select_initial_moves_keeps_distinct_moves_and_limits_to_four(monkeypatc
 def test_build_initial_attributes_uses_base_stats(monkeypatch):
     rolls = iter([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     monkeypatch.setattr(
-        "app.domain.my_pokemon.business.random.uniform",
+        "app.domain.progression.business.random.uniform",
         lambda _min, _max: next(rolls),
     )
     base_pokemon = SimpleNamespace(

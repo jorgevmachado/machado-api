@@ -29,9 +29,7 @@ class AuthService:
     ) -> None:
         self.repository = repository
         session = repository.session
-        self.trainer_service = trainer_service or TrainerService.from_session(
-            session
-        )
+        self.trainer_service = trainer_service or TrainerService.from_session(session)
 
     async def register(self, data: RegisterSchema) -> User:
         try:

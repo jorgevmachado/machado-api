@@ -157,7 +157,7 @@ async def test_create_requires_existing_trainer():
 @pytest.mark.asyncio
 async def test_create_persists_owned_pokemon_when_trainer_exists(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.my_pokemon.business.random.uniform",
+        "app.domain.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(base_pokemon=build_base_pokemon())
@@ -181,7 +181,7 @@ async def test_create_persists_owned_pokemon_when_trainer_exists(monkeypatch):
 @pytest.mark.asyncio
 async def test_create_uses_base_name_as_public_name_when_collision(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.my_pokemon.business.random.uniform",
+        "app.domain.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(
@@ -361,7 +361,9 @@ async def test_get_trainer_or_404_raises_when_trainer_does_not_exist():
     service = MyPokemonService(repository, FakeTrainerService(trainer=None))
 
     with pytest.raises(HTTPException) as exc_info:
-        await service._get_trainer_or_404(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+        await service._get_trainer_or_404(
+            SimpleNamespace(id=uuid4(), role=RoleEnum.USER)
+        )
 
     assert exc_info.value.status_code == 404
 
@@ -387,7 +389,7 @@ async def test_create_owned_for_trainer_raises_internal_error_when_reload_fails(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "app.domain.my_pokemon.business.random.uniform",
+        "app.domain.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(base_pokemon=build_base_pokemon())
@@ -411,7 +413,7 @@ async def test_create_owned_for_trainer_does_not_rollback_when_commit_is_disable
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "app.domain.my_pokemon.business.random.uniform",
+        "app.domain.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(base_pokemon=build_base_pokemon())

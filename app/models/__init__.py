@@ -1,6 +1,7 @@
 from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
 from app.models.my_pokemon import MyPokemon
 from app.models.my_pokemon_move import MyPokemonMove
+from app.models.pokedex import Pokedex
 from app.models.pokemon import Pokemon
 from app.models.pokemon_ability import PokemonAbility
 from app.models.pokemon_ability_link import PokemonAbilityLink
@@ -24,6 +25,7 @@ __all__ = [
     "GenderEnum",
     "MyPokemon",
     "MyPokemonMove",
+    "Pokedex",
     "Pokemon",
     "PokemonAbility",
     "PokemonAbilityLink",

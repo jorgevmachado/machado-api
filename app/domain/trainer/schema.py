@@ -3,6 +3,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.my_pokemon.schema import MyPokemonSchema
+from app.domain.pokedex.schema import PokedexSchema
+
 
 class TrainerSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -25,3 +27,4 @@ class OnboardingTrainerSchema(BaseModel):
 
 class TrainerOnboardingResponseSchema(TrainerSchema):
     my_pokemons: list[MyPokemonSchema] = []
+    pokedex: list[PokedexSchema] = []

@@ -21,6 +21,7 @@ from app.models.enums import PokemonStatusEnum
 
 if TYPE_CHECKING:
     from app.models.my_pokemon import MyPokemon
+    from app.models.pokedex import Pokedex
     from app.models.pokemon_ability import PokemonAbility
     from app.models.pokemon_encounter import PokemonEncounter
     from app.models.pokemon_growth_rate import PokemonGrowthRate
@@ -158,6 +159,13 @@ class Pokemon:
         default_factory=list,
     )
     my_pokemons: Mapped[list["MyPokemon"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="pokemon",
+    )
+    pokedex: Mapped[list["Pokedex"]] = relationship(
         lazy=default_lazy,
         default_factory=list,
         init=False,

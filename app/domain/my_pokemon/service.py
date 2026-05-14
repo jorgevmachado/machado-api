@@ -10,12 +10,12 @@ from app.core.cache.service import CacheService
 from app.core.logging import LoggingParams
 from app.core.pagination import CustomLimitOffsetPage
 from app.domain.my_pokemon.business import (
-    build_initial_attributes,
     build_unique_owned_name,
     resolve_effective_nickname,
     select_initial_moves,
     slugify_name,
 )
+from app.domain.progression.business import build_initial_attributes
 from app.domain.my_pokemon.repository import MyPokemonRepository
 from app.domain.my_pokemon.schema import (
     CreateMyPokemonSchema,

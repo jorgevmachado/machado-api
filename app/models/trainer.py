@@ -12,6 +12,7 @@ from app.models.common import utcnow
 
 if TYPE_CHECKING:
     from app.models.my_pokemon import MyPokemon
+    from app.models.pokedex import Pokedex
 
 
 @table_registry.mapped_as_dataclass
@@ -36,6 +37,13 @@ class Trainer:
     )
 
     my_pokemons: Mapped[list["MyPokemon"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+    pokedex: Mapped[list["Pokedex"]] = relationship(
         lazy=default_lazy,
         default_factory=list,
         init=False,

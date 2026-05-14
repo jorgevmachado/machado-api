@@ -17,6 +17,7 @@ from app.domain.my_pokemon.business import (
     STARTER_POKEMON_NAMES,
 )
 from app.domain.my_pokemon.repository import MyPokemonRepository
+from app.domain.pokedex.repository import PokedexRepository
 from app.domain.trainer.repository import TrainerRepository
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
@@ -31,13 +32,15 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.domain.my_pokemon.service import MyPokemonService
+    from app.domain.pokedex.service import PokedexService
 
 
 class TrainerService(BaseService[TrainerRepository, Trainer]):
     def __init__(
-            self,
-            repository: TrainerRepository,
-            my_pokemon_service: MyPokemonService | None = None,
+        self,
+        repository: TrainerRepository,
+        my_pokemon_service: MyPokemonService | None = None,
+        pokedex_service: PokedexService | None = None,
     ) -> None:
         super().__init__(
             alias="Trainer",
@@ -54,7 +57,15 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 MyPokemonRepository(repository.session),
                 trainer_service=self,
             )
+        if pokedex_service is None:
+            from app.domain.pokedex.service import PokedexService
+
+            pokedex_service = PokedexService(
+                PokedexRepository(repository.session),
+                trainer_service=self,
+            )
         self.my_pokemon_service = my_pokemon_service
+        self.pokedex_service = pokedex_service
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -64,15 +75,24 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         return await self.repository.find_by(user_id=user_id)
 
     async def create(
-        self, *, user_id: UUID, pokeballs: int, capture_rate: int
+        self,
+        *,
+        user_id: UUID,
+        pokeballs: int,
+        capture_rate: int,
+        commit: bool = True,
     ) -> Trainer:
-        return await self.repository.save(
-            entity=Trainer(
-                user_id=user_id,
-                pokeballs=pokeballs,
-                capture_rate=capture_rate,
-            )
+        entity = Trainer(
+            user_id=user_id,
+            pokeballs=pokeballs,
+            capture_rate=capture_rate,
         )
+        self.repository.session.add(entity)
+        await self.repository.session.flush()
+        if commit:
+            await self.repository.session.commit()
+            await self.repository.session.refresh(entity)
+        return entity
 
     async def onboard(
         self,
@@ -103,11 +123,18 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 capture_rate=payload.capture_rate
                 if is_admin and payload.capture_rate
                 else DEFAULT_TRAINER_CAPTURE_RATE,
+                commit=False,
             )
             created = await self.my_pokemon_service.create_owned_for_trainer(
                 trainer_id=trainer.id,
                 pokemon_name=pokemon_name,
                 nickname=payload.nickname,
+                commit=False,
+            )
+            pokedex = await self.pokedex_service.initialize_for_trainer(
+                trainer_id=trainer.id,
+                discovered_pokemon_name=pokemon_name,
+                discovered_at=created.captured_at,
                 commit=False,
             )
             await self.repository.session.commit()
@@ -120,6 +147,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 updated_at=trainer.updated_at,
                 deleted_at=trainer.deleted_at,
                 my_pokemons=[self.my_pokemon_service.to_schema(created)],
+                pokedex=[self.pokedex_service.to_schema(entry) for entry in pokedex],
             )
         except Exception as exception:
             await self.repository.session.rollback()
