@@ -11,8 +11,11 @@ from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
+    from app.models.exploration_event import ExplorationEvent
     from app.models.my_pokemon import MyPokemon
     from app.models.pokedex import Pokedex
+    from app.models.trainer_encounter import TrainerEncounter
+    from app.models.trainer_party import TrainerParty
 
 
 @table_registry.mapped_as_dataclass
@@ -44,6 +47,27 @@ class Trainer:
         back_populates="trainer",
     )
     pokedex: Mapped[list["Pokedex"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+    known_encounters: Mapped[list["TrainerEncounter"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+    party_slots: Mapped[list["TrainerParty"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+    exploration_events: Mapped[list["ExplorationEvent"]] = relationship(
         lazy=default_lazy,
         default_factory=list,
         init=False,

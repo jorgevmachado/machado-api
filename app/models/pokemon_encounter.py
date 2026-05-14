@@ -12,6 +12,7 @@ from app.models.common import utcnow
 
 if TYPE_CHECKING:
     from app.models.pokemon import Pokemon
+    from app.models.trainer_encounter import TrainerEncounter
 
 
 @table_registry.mapped_as_dataclass
@@ -48,4 +49,11 @@ class PokemonEncounter:
         default_factory=list,
         init=False,
         repr=False,
+    )
+    trainer_encounters: Mapped[list["TrainerEncounter"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="pokemon_encounter",
     )

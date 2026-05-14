@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.my_pokemon.schema import MyPokemonSchema
 from app.domain.pokedex.schema import PokedexSchema
+from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
 
 
 class TrainerSchema(BaseModel):
@@ -25,6 +26,18 @@ class OnboardingTrainerSchema(BaseModel):
     capture_rate: int | None = Field(default=None, ge=1, le=255)
 
 
+class TrainerOnboardingEncounterSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime | None = None
+    deleted_at: datetime | None = None
+    pokemon_encounter: PokemonEncounterSchema
+
+
 class TrainerOnboardingResponseSchema(TrainerSchema):
     my_pokemons: list[MyPokemonSchema] = []
     pokedex: list[PokedexSchema] = []
+    known_encounters: list[TrainerOnboardingEncounterSchema] = []

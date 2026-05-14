@@ -21,3 +21,8 @@ class RoleEnum(str, Enum):
 class PokemonStatusEnum(str, Enum):
     COMPLETE = "COMPLETE"
     INCOMPLETE = "INCOMPLETE"
+
+
+class ExplorationEventTypeEnum(str, Enum):
+    WILD_POKEMON = "WILD_POKEMON"
+    POKEBALLS = "POKEBALLS"

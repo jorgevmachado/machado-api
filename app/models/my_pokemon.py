@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.my_pokemon_move import MyPokemonMove
     from app.models.pokemon import Pokemon
     from app.models.trainer import Trainer
+    from app.models.trainer_party import TrainerParty
 
 
 @table_registry.mapped_as_dataclass
@@ -61,6 +62,13 @@ class MyPokemon:
         back_populates="my_pokemons",
     )
     moves: Mapped[list["MyPokemonMove"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="my_pokemon",
+    )
+    party_slots: Mapped[list["TrainerParty"]] = relationship(
         lazy=default_lazy,
         default_factory=list,
         init=False,

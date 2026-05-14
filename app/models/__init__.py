@@ -1,4 +1,6 @@
+from app.models.enums import ExplorationEventTypeEnum
 from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
+from app.models.exploration_event import ExplorationEvent
 from app.models.my_pokemon import MyPokemon
 from app.models.my_pokemon_move import MyPokemonMove
 from app.models.pokedex import Pokedex
@@ -19,9 +21,13 @@ from app.models.pokemon_type_weakness import PokemonTypeWeakness
 from app.models.pokemon_type_strength import PokemonTypeStrength
 from app.models.pokemon_type_link import PokemonTypeLink
 from app.models.trainer import Trainer
+from app.models.trainer_encounter import TrainerEncounter
+from app.models.trainer_party import TrainerParty
 from app.models.user import User
 
 __all__ = [
+    "ExplorationEvent",
+    "ExplorationEventTypeEnum",
     "GenderEnum",
     "MyPokemon",
     "MyPokemonMove",
@@ -46,5 +52,7 @@ __all__ = [
     "RoleEnum",
     "StatusEnum",
     "Trainer",
+    "TrainerEncounter",
+    "TrainerParty",
     "User",
 ]

@@ -19,6 +19,7 @@ from app.domain.my_pokemon.business import (
 from app.domain.my_pokemon.repository import MyPokemonRepository
 from app.domain.pokedex.repository import PokedexRepository
 from app.domain.trainer.repository import TrainerRepository
+from app.domain.trainer_exploration.repository import TrainerExplorationRepository
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
     TrainerOnboardingResponseSchema,
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from app.domain.my_pokemon.service import MyPokemonService
     from app.domain.pokedex.service import PokedexService
+    from app.domain.trainer_exploration.service import TrainerExplorationService
 
 
 class TrainerService(BaseService[TrainerRepository, Trainer]):
@@ -41,6 +43,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         repository: TrainerRepository,
         my_pokemon_service: MyPokemonService | None = None,
         pokedex_service: PokedexService | None = None,
+        trainer_exploration_service: TrainerExplorationService | None = None,
     ) -> None:
         super().__init__(
             alias="Trainer",
@@ -64,8 +67,16 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 PokedexRepository(repository.session),
                 trainer_service=self,
             )
+        if trainer_exploration_service is None:
+            from app.domain.trainer_exploration.service import TrainerExplorationService
+
+            trainer_exploration_service = TrainerExplorationService(
+                TrainerExplorationRepository(repository.session),
+                trainer_service=self,
+            )
         self.my_pokemon_service = my_pokemon_service
         self.pokedex_service = pokedex_service
+        self.trainer_exploration_service = trainer_exploration_service
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -137,6 +148,13 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 discovered_at=created.captured_at,
                 commit=False,
             )
+            known_encounters = (
+                await self.trainer_exploration_service.initialize_for_trainer(
+                    trainer_id=trainer.id,
+                    starter_pokemon_name=pokemon_name,
+                    commit=False,
+                )
+            )
             await self.repository.session.commit()
             return TrainerOnboardingResponseSchema(
                 id=trainer.id,
@@ -148,6 +166,10 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 deleted_at=trainer.deleted_at,
                 my_pokemons=[self.my_pokemon_service.to_schema(created)],
                 pokedex=[self.pokedex_service.to_schema(entry) for entry in pokedex],
+                known_encounters=[
+                    self.trainer_exploration_service.to_encounter_schema(entry)
+                    for entry in known_encounters
+                ],
             )
         except Exception as exception:
             await self.repository.session.rollback()
