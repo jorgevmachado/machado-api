@@ -6,8 +6,8 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.domain.my_pokemon.schema import MyPokemonSchema
-from app.domain.pokedex.schema import PokedexSchema
+from app.domain.trainer.my_pokemon import MyPokemonSchema
+from app.domain.trainer.pokedex.schema import PokedexSchema
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
     TrainerOnboardingEncounterSchema,
@@ -125,6 +125,25 @@ class FakePokedexService:
                     id=uuid4(),
                     name="bulbasaur",
                     order=1,
+                    hp=45,
+                    speed=45,
+                    height=7,
+                    weight=69,
+                    status='COMPLETE',
+                    attack=49,
+                    defense=49,
+                    is_baby=False,
+                    gender_rate=1,
+                    is_mythical=False,
+                    is_legendary=False,
+                    capture_rate=45,
+                    hatch_counter=20,
+                    base_happiness=50,
+                    special_attack=65,
+                    special_defense=65,
+                    base_experience=64,
+                    has_gender_differences=False,
+                    created_at=datetime.now(timezone.utc),
                     external_image="https://example.com/bulbasaur.png",
                     types=[],
                 ),

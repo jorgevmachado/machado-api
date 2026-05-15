@@ -11,15 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import handle_service_exception
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
-from app.domain.my_pokemon.business import (
+from app.domain.trainer.my_pokemon.business import (
     DEFAULT_TRAINER_CAPTURE_RATE,
     DEFAULT_TRAINER_POKEBALLS,
     STARTER_POKEMON_NAMES,
 )
-from app.domain.my_pokemon.repository import MyPokemonRepository
-from app.domain.pokedex.repository import PokedexRepository
+from app.domain.trainer.my_pokemon.repository import MyPokemonRepository
+from app.domain.trainer.pokedex.repository import PokedexRepository
 from app.domain.trainer.repository import TrainerRepository
-from app.domain.trainer_exploration.repository import TrainerExplorationRepository
+from app.domain.trainer.trainer_exploration.repository import TrainerExplorationRepository
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
     TrainerOnboardingResponseSchema,
@@ -32,9 +32,9 @@ from app.models.enums import RoleEnum
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from app.domain.my_pokemon.service import MyPokemonService
-    from app.domain.pokedex.service import PokedexService
-    from app.domain.trainer_exploration.service import TrainerExplorationService
+    from app.domain.trainer.my_pokemon import MyPokemonService
+    from app.domain.trainer.pokedex.service import PokedexService
+    from app.domain.trainer.trainer_exploration import TrainerExplorationService
 
 
 class TrainerService(BaseService[TrainerRepository, Trainer]):
@@ -54,21 +54,21 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             schema_class=TrainerSchema,
         )
         if my_pokemon_service is None:
-            from app.domain.my_pokemon.service import MyPokemonService
+            from app.domain.trainer.my_pokemon import MyPokemonService
 
             my_pokemon_service = MyPokemonService(
                 MyPokemonRepository(repository.session),
                 trainer_service=self,
             )
         if pokedex_service is None:
-            from app.domain.pokedex.service import PokedexService
+            from app.domain.trainer.pokedex.service import PokedexService
 
             pokedex_service = PokedexService(
                 PokedexRepository(repository.session),
                 trainer_service=self,
             )
         if trainer_exploration_service is None:
-            from app.domain.trainer_exploration.service import TrainerExplorationService
+            from app.domain.trainer.trainer_exploration import TrainerExplorationService
 
             trainer_exploration_service = TrainerExplorationService(
                 TrainerExplorationRepository(repository.session),

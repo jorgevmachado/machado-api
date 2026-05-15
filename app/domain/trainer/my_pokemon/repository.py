@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from fastapi_pagination.ext.sqlalchemy import paginate
@@ -32,34 +33,31 @@ class MyPokemonRepository(BaseRepository[MyPokemon]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
-    async def list_owned(
-        self,
-        trainer_id: UUID,
-        page_filter: FilterPage | None = None,
-    ):
+    async def list_all(self, page_filter: FilterPage | None = None):
+        filter_page = FilterPage.build(page_filter)
         query = (
             select(MyPokemon)
-            .where(
-                MyPokemon.trainer_id == trainer_id,
-                MyPokemon.deleted_at.is_(None),
-            )
-            .order_by(MyPokemon.created_at)
+            .where(MyPokemon.deleted_at.is_(None))
         )
         for option in self.relations:
             query = query.options(option)
 
-        if page_filter is not None:
-            filters = page_filter.model_dump(exclude_none=True)
-            name = filters.get("name")
-            pokemon_name = filters.get("pokemon_name")
+        trainer_id = getattr(filter_page, "trainer_id", None)
+        name = getattr(filter_page, "name", None)
+        pokemon_name = getattr(filter_page, "pokemon_name", None)
 
-            if name:
-                query = query.where(MyPokemon.name.ilike(f"%{name}%"))
-            if pokemon_name:
-                query = query.where(MyPokemon.pokemon.has(name=pokemon_name))
+        if trainer_id:
+            query = query.where(MyPokemon.trainer_id == trainer_id)
 
-        if is_paginate(page_filter):
-            params = get_limit_offset_params(page_filter)
+        if name:
+            query = query.where(MyPokemon.name.ilike(f"%{name}%"))
+        if pokemon_name:
+            query = query.where(MyPokemon.pokemon.has(name=pokemon_name))
+
+        query = self._apply_order_by(query, filter_page)
+
+        if is_paginate(filter_page):
+            params = get_limit_offset_params(filter_page)
             result = await paginate(self.session, query, params=params)
             total = getattr(result, "total", None)
             if total is None and hasattr(result, "meta"):
@@ -73,14 +71,27 @@ class MyPokemonRepository(BaseRepository[MyPokemon]):
         result = await self.session.scalars(query)
         return result.all()
 
-    async def find_owned_detail(self, trainer_id: UUID, name: str) -> MyPokemon | None:
-        query = select(MyPokemon).where(
-            MyPokemon.trainer_id == trainer_id,
-            MyPokemon.name == name,
-            MyPokemon.deleted_at.is_(None),
-        )
+    async def find_by(self, **kwargs: Any) -> MyPokemon | None:
+        query = select(MyPokemon).where(MyPokemon.deleted_at.is_(None))
         for option in self.relations:
             query = query.options(option)
+
+        trainer_id = kwargs.get("trainer_id")
+        if trainer_id is not None:
+            query = query.where(MyPokemon.trainer_id == trainer_id)
+
+        entity_id = kwargs.get("id")
+        if entity_id is not None:
+            query = query.where(MyPokemon.id == entity_id)
+
+        name = kwargs.get("name")
+        if name is not None:
+            query = query.where(MyPokemon.name == name)
+
+        pokemon_name = kwargs.get("pokemon_name")
+        if pokemon_name is not None:
+            query = query.where(MyPokemon.pokemon.has(name=pokemon_name))
+
         return await self.session.scalar(query)
 
     async def find_base_pokemon(self, pokemon_name: str) -> Pokemon | None:

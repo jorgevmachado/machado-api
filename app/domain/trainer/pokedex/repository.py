@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from fastapi_pagination.ext.sqlalchemy import paginate
@@ -20,61 +21,53 @@ class PokedexRepository(BaseRepository[Pokedex]):
     default_order_by = "pokemon.order"
     relations = (
         selectinload(Pokedex.pokemon).selectinload(Pokemon.types),
-        selectinload(Pokedex.pokemon)
-        .selectinload(Pokemon.types)
-        .selectinload(PokemonType.weaknesses),
-        selectinload(Pokedex.pokemon)
-        .selectinload(Pokemon.types)
-        .selectinload(PokemonType.strengths),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.types).selectinload(PokemonType.weaknesses),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.types).selectinload(PokemonType.strengths),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.moves),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.images),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.shape),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.habitat),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.abilities),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.evolutions),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.encounters),
+        selectinload(Pokedex.pokemon).selectinload(Pokemon.growth_rate),
         selectinload(Pokedex.trainer),
     )
 
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
-    async def list_catalog_pokemon(self) -> list[Pokemon]:
-        query = (
-            select(Pokemon)
-            .where(Pokemon.deleted_at.is_(None))
-            .options(selectinload(Pokemon.types))
-            .order_by(Pokemon.order)
-        )
-        result = await self.session.scalars(query)
-        return result.all()
-
-    async def list_owned(
-        self,
-        trainer_id: UUID,
-        page_filter: FilterPage | None = None,
-    ):
+    async def list_all(self, page_filter: FilterPage | None = None):
+        filter_page = FilterPage.build(page_filter)
         query = (
             select(Pokedex)
             .join(Pokedex.pokemon)
             .where(
-                Pokedex.trainer_id == trainer_id,
                 Pokedex.deleted_at.is_(None),
                 Pokemon.deleted_at.is_(None),
             )
-            .order_by(Pokemon.order)
         )
         for option in self.relations:
             query = query.options(option)
 
-        if page_filter is not None:
-            filters = page_filter.model_dump(exclude_none=True)
-            nickname = filters.get("nickname")
-            pokemon_name = filters.get("pokemon_name")
-            discovered = filters.get("discovered")
+        trainer_id = getattr(filter_page, "trainer_id", None)
+        nickname = getattr(filter_page, "nickname", None)
+        pokemon_name = getattr(filter_page, "pokemon_name", None)
+        discovered = getattr(filter_page, "discovered", None)
 
-            if nickname:
-                query = query.where(Pokedex.nickname.ilike(f"%{nickname}%"))
-            if pokemon_name:
-                query = query.where(Pokedex.pokemon.has(name=pokemon_name))
-            if discovered is not None:
-                query = query.where(Pokedex.discovered == discovered)
+        if trainer_id:
+            query = query.where(Pokedex.trainer_id == trainer_id)
+        if nickname:
+            query = query.where(Pokedex.nickname.ilike(f"%{nickname}%"))
+        if pokemon_name:
+            query = query.where(Pokemon.name == pokemon_name)
+        if discovered is not None:
+            query = query.where(Pokedex.discovered == discovered)
 
-        if is_paginate(page_filter):
-            params = get_limit_offset_params(page_filter)
+        query = self._apply_order_by(query, filter_page)
+
+        if is_paginate(filter_page):
+            params = get_limit_offset_params(filter_page)
             result = await paginate(self.session, query, params=params)
             total = getattr(result, "total", None)
             if total is None and hasattr(result, "meta"):
@@ -88,24 +81,49 @@ class PokedexRepository(BaseRepository[Pokedex]):
         result = await self.session.scalars(query)
         return result.all()
 
-    async def find_owned_detail(
-        self,
-        trainer_id: UUID,
-        pokemon_name: str,
-    ) -> Pokedex | None:
+    async def find_by(self, **kwargs: Any) -> Pokedex | None:
         query = (
             select(Pokedex)
             .join(Pokedex.pokemon)
             .where(
-                Pokedex.trainer_id == trainer_id,
                 Pokedex.deleted_at.is_(None),
                 Pokemon.deleted_at.is_(None),
-                Pokemon.name == pokemon_name,
             )
         )
         for option in self.relations:
             query = query.options(option)
+
+        trainer_id = kwargs.get("trainer_id")
+        if trainer_id is not None:
+            query = query.where(Pokedex.trainer_id == trainer_id)
+
+        entity_id = kwargs.get("id")
+        if entity_id is not None:
+            query = query.where(Pokedex.id == entity_id)
+
+        name = kwargs.get("name")
+        if name is not None:
+            query = query.where(Pokemon.name == name)
+
+        pokemon_name = kwargs.get("pokemon_name")
+        if pokemon_name is not None:
+            query = query.where(Pokemon.name == pokemon_name)
+
+        discovered = kwargs.get("discovered")
+        if discovered is not None:
+            query = query.where(Pokedex.discovered == discovered)
+
         return await self.session.scalar(query)
+
+    async def list_catalog_pokemon(self) -> list[Pokemon]:
+        query = (
+            select(Pokemon)
+            .where(Pokemon.deleted_at.is_(None))
+            .options(selectinload(Pokemon.types))
+            .order_by(Pokemon.order)
+        )
+        result = await self.session.scalars(query)
+        return result.all()
 
     async def create_for_trainer(
         self,

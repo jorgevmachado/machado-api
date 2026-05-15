@@ -9,18 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache.service import CacheService
 from app.core.logging import LoggingParams
-from app.domain.my_pokemon.schema import MyPokemonOwnedMoveSchema, MyPokemonSchema
-from app.domain.pokedex.service import PokedexService
+from app.core.service import BaseService
+from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
+from app.domain.trainer.pokedex.schema import PokedexSchema
 from app.domain.trainer.schema import TrainerSchema
-from app.domain.trainer_exploration.business import (
+from app.domain.trainer.trainer_exploration.business import (
     build_pokeball_reward,
     choose_event_type,
     choose_wild_pokemon,
     resolve_initial_active_encounter,
     validate_party_selection,
 )
-from app.domain.trainer_exploration.repository import TrainerExplorationRepository
-from app.domain.trainer_exploration.schema import (
+from app.domain.trainer.trainer_exploration.repository import TrainerExplorationRepository
+from app.domain.trainer.trainer_exploration.schema import (
     ExplorationEventSchema,
     SelectTrainerEncounterSchema,
     TrainerEncounterSchema,
@@ -28,8 +29,9 @@ from app.domain.trainer_exploration.schema import (
     TrainerPartyMemberSchema,
     UpdateTrainerPartySchema,
 )
-from app.models import ExplorationEventTypeEnum, MyPokemon, Trainer, User
+from app.models import ExplorationEventTypeEnum, MyPokemon, Trainer, TrainerEncounter, User
 from app.models.common import utcnow
+from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
 
@@ -37,40 +39,42 @@ if TYPE_CHECKING:
     from app.domain.trainer.service import TrainerService
 
 
-class TrainerExplorationService:
+class TrainerExplorationService(
+    BaseService[TrainerExplorationRepository, TrainerEncounter, TrainerEncounterSchema]
+):
     def __init__(
         self,
         repository: TrainerExplorationRepository,
         trainer_service: TrainerService | None = None,
     ) -> None:
-        self.repository = repository
+        super().__init__(
+            alias="TrainerEncounters",
+            repository=repository,
+            logger_params=LoggingParams(
+                logger=logger,
+                service="TrainerExplorationService",
+                operation="trainer_exploration",
+            ),
+            schema_class=TrainerEncounterSchema,
+            cache_prefix="trainer",
+        )
         session = repository.session
         if trainer_service is None:
             from app.domain.trainer.service import TrainerService
 
             trainer_service = TrainerService.from_session(session)
         self.trainer_service = trainer_service
-        logger_params = LoggingParams(
-            logger=logger,
-            service="TrainerExplorationService",
-            operation="trainer_exploration",
-        )
         self.home_cache_service = CacheService(
             alias="TrainerHome",
             prefix="trainer",
-            logger_params=logger_params,
+            logger_params=self.logger_params,
             schema_class=TrainerHomeSchema,
         )
-        self.encounter_cache_service = CacheService(
-            alias="TrainerEncounters",
-            prefix="trainer",
-            logger_params=logger_params,
-            schema_class=TrainerEncounterSchema,
-        )
+        self.encounter_cache_service = self.cache_service
         self.party_cache_service = CacheService(
             alias="TrainerParty",
             prefix="trainer",
-            logger_params=logger_params,
+            logger_params=self.logger_params,
             schema_class=TrainerPartyMemberSchema,
         )
 
@@ -81,20 +85,15 @@ class TrainerExplorationService:
     def _home_key(self, trainer_id: str) -> str:
         return self.home_cache_service.cache.build_key("trainer", "home", trainer_id)
 
-    def _encounter_key(self, trainer_id: str) -> str:
-        return self.encounter_cache_service.cache.build_key(
-            "trainer",
-            "encounters",
-            trainer_id,
-        )
-
     def _party_key(self, trainer_id: str) -> str:
         return self.party_cache_service.cache.build_key("trainer", "party", trainer_id)
 
     async def _invalidate_cache(self, trainer_id: str) -> None:
         await self.home_cache_service.cache.delete_cache(self._home_key(trainer_id))
         await self.encounter_cache_service.cache.delete_cache(
-            self._encounter_key(trainer_id)
+            self.encounter_cache_service.build_key_list(
+                FilterPage.build(trainer_id=trainer_id)
+            )
         )
         await self.party_cache_service.cache.delete_cache(self._party_key(trainer_id))
 
@@ -126,21 +125,17 @@ class TrainerExplorationService:
             await self._invalidate_cache(str(trainer_id))
         result = []
         for entity in entities:
-            fresh = await self.repository.find_trainer_encounter(trainer_id, entity.id)
+            fresh = await self.repository.find_by(
+                trainer_id=trainer_id,
+                id=entity.id,
+            )
             if fresh is not None:
                 result.append(fresh)
         return result
 
     async def list_encounters(self, current_user: User) -> list[TrainerEncounterSchema]:
         trainer = await self._get_trainer_or_404(current_user)
-        key = self._encounter_key(str(trainer.id))
-        cached = await self.encounter_cache_service.get_list(key)
-        if cached:
-            return cached
-        entities = await self.repository.list_trainer_encounters(trainer.id)
-        serialized = [self.to_encounter_schema(entity) for entity in entities]
-        await self.encounter_cache_service.set_list(key, serialized)
-        return serialized
+        return await super().list_all_cached(trainer_id=str(trainer.id))
 
     async def select_active_encounter(
         self,
@@ -148,7 +143,10 @@ class TrainerExplorationService:
         payload: SelectTrainerEncounterSchema,
     ) -> TrainerEncounterSchema:
         trainer = await self._get_trainer_or_404(current_user)
-        entity = await self.repository.find_trainer_encounter(trainer.id, payload.encounter_id)
+        entity = await self.repository.find_by(
+            trainer_id=trainer.id,
+            id=payload.encounter_id,
+        )
         if entity is None:
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND,
@@ -158,7 +156,10 @@ class TrainerExplorationService:
         entity.is_active = True
         await self.repository.session.commit()
         await self._invalidate_cache(str(trainer.id))
-        fresh = await self.repository.find_trainer_encounter(trainer.id, payload.encounter_id)
+        fresh = await self.repository.find_by(
+            trainer_id=trainer.id,
+            id=payload.encounter_id,
+        )
         if fresh is None:
             raise HTTPException(
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -257,7 +258,7 @@ class TrainerExplorationService:
             else None,
             party=[self.to_party_schema(entity) for entity in party],
             latest_discoveries=[
-                PokedexService.to_schema(entry) for entry in latest_discoveries
+                PokedexSchema.model_validate(entry) for entry in latest_discoveries
             ],
         )
         await self.home_cache_service.set_one(key, serialized)
@@ -265,28 +266,11 @@ class TrainerExplorationService:
 
     @staticmethod
     def to_encounter_schema(entity) -> TrainerEncounterSchema:
-        return TrainerEncounterSchema(
-            id=entity.id,
-            is_active=entity.is_active,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-            deleted_at=entity.deleted_at,
-            pokemon_encounter=entity.pokemon_encounter,
-        )
+        return TrainerEncounterSchema.model_validate(entity)
 
     @staticmethod
     def to_party_schema(entity) -> TrainerPartyMemberSchema:
-        return TrainerPartyMemberSchema(
-            id=entity.id,
-            slot=entity.slot,
-            is_active=entity.is_active,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-            deleted_at=entity.deleted_at,
-            my_pokemon=TrainerExplorationService.to_my_pokemon_schema(
-                entity.my_pokemon
-            ),
-        )
+        return TrainerPartyMemberSchema.model_validate(entity)
 
     @staticmethod
     def to_event_schema(entity, active_encounter=None) -> ExplorationEventSchema:
@@ -318,36 +302,4 @@ class TrainerExplorationService:
 
     @staticmethod
     def to_my_pokemon_schema(entity: MyPokemon) -> MyPokemonSchema:
-        return MyPokemonSchema(
-            id=entity.id,
-            name=entity.name,
-            nickname=entity.nickname,
-            level=entity.level,
-            experience=entity.experience,
-            hp=entity.hp,
-            max_hp=entity.max_hp,
-            attack=entity.attack,
-            defense=entity.defense,
-            special_attack=entity.special_attack,
-            special_defense=entity.special_defense,
-            speed=entity.speed,
-            captured_at=entity.captured_at,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-            pokemon=entity.pokemon,
-            trainer=entity.trainer,
-            moves=[
-                MyPokemonOwnedMoveSchema(
-                    id=move.id,
-                    pp=move.pp,
-                    max_pp=move.max_pp,
-                    pokemon_move_id=move.pokemon_move_id,
-                    pokemon_move_name=move.pokemon_move.name,
-                    pokemon_move_type=move.pokemon_move.type,
-                    pokemon_move_power=move.pokemon_move.power,
-                    pokemon_move_accuracy=move.pokemon_move.accuracy,
-                )
-                for move in entity.moves
-                if move.deleted_at is None and move.pokemon_move is not None
-            ],
-        )
+        return MyPokemonSchema.model_validate(entity)

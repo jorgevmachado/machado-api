@@ -2,8 +2,8 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.my_pokemon.schema import MyPokemonSchema
-from app.domain.pokedex.schema import PokedexSchema
+from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
+from app.domain.trainer.pokedex.schema import PokedexSchema
 from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
 
 

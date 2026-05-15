@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.domain.progression.business import build_initial_attributes
+from app.domain.trainer.progression.business import build_initial_attributes
 from app.models.common import utcnow
 from app.models.pokemon import Pokemon
 

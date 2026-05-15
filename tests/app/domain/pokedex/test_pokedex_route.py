@@ -3,14 +3,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.domain.pokedex.route import (
+from app.domain.trainer.pokedex.route import (
     discover_pokedex,
     get_pokedex_detail,
     get_pokedex_filter,
     get_pokedex_service,
     list_pokedex,
 )
-from app.domain.pokedex.service import PokedexService
+from app.domain.trainer.pokedex.service import PokedexService
 
 
 def test_get_pokedex_service_builds_service():
@@ -41,31 +41,37 @@ async def test_list_pokedex_delegates_to_service():
     page_filter = get_pokedex_filter(page=1, limit=12)
     expected = SimpleNamespace(items=[])
     service.list_all_cached.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="trainer-id")
 
     result = await list_pokedex(
-        current_user=current_user,
+        current_trainer=current_trainer,
         service=service,
         page_filter=page_filter,
     )
 
     assert result is expected
-    service.list_all_cached.assert_awaited_once_with(current_user, page_filter)
+    service.list_all_cached.assert_awaited_once_with(
+        page_filter=page_filter,
+        trainer_id="trainer-id",
+    )
 
 
 @pytest.mark.asyncio
 async def test_get_pokedex_detail_delegates_to_service():
     service = AsyncMock()
     expected = SimpleNamespace(id="1")
-    service.find_detail.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    service.find_one_cached.return_value = expected
+    current_trainer = SimpleNamespace(id="trainer-id")
 
     result = await get_pokedex_detail(
-        "bulbasaur", current_user=current_user, service=service
+        "bulbasaur", current_trainer=current_trainer, service=service
     )
 
     assert result is expected
-    service.find_detail.assert_awaited_once_with(current_user, "bulbasaur")
+    service.find_one_cached.assert_awaited_once_with(
+        param="bulbasaur",
+        trainer_id="trainer-id",
+    )
 
 
 @pytest.mark.asyncio
@@ -73,11 +79,14 @@ async def test_discover_pokedex_delegates_to_service():
     service = AsyncMock()
     expected = SimpleNamespace(id="1", discovered=True)
     service.discover.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="trainer-id")
 
     result = await discover_pokedex(
-        "bulbasaur", current_user=current_user, service=service
+        "bulbasaur", current_trainer=current_trainer, service=service
     )
 
     assert result is expected
-    service.discover.assert_awaited_once_with(current_user, "bulbasaur")
+    service.discover.assert_awaited_once_with(
+        trainer=current_trainer,
+        pokemon_name="bulbasaur",
+    )

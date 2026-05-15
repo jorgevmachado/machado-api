@@ -5,8 +5,8 @@ from uuid import uuid4
 import pytest
 from fastapi_pagination import LimitOffsetParams
 
-from app.domain.pokedex import repository as repository_module
-from app.domain.pokedex.repository import PokedexRepository
+from app.domain.trainer.pokedex import repository as repository_module
+from app.domain.trainer.pokedex.repository import PokedexRepository
 from app.shared.schemas import FilterPage
 
 
@@ -56,21 +56,23 @@ async def test_list_catalog_pokemon_returns_all_non_deleted_catalog_entries():
 
 
 @pytest.mark.asyncio
-async def test_list_owned_without_pagination_returns_all_items():
+async def test_list_all_without_pagination_returns_all_items():
     session = FakeSession()
     session.scalars_result = [
         SimpleNamespace(pokemon=SimpleNamespace(name="bulbasaur"))
     ]
     repository = PokedexRepository(session)
 
-    result = await repository.list_owned(uuid4(), FilterPage.build(nickname="leaf"))
+    result = await repository.list_all(
+        FilterPage.build(trainer_id=uuid4(), nickname="leaf")
+    )
 
     assert len(result) == 1
     assert result[0].pokemon.name == "bulbasaur"
 
 
 @pytest.mark.asyncio
-async def test_list_owned_with_pagination_uses_meta_total_when_total_is_missing(
+async def test_list_all_with_pagination_uses_meta_total_when_total_is_missing(
     monkeypatch,
 ):
     session = FakeSession()
@@ -92,15 +94,15 @@ async def test_list_owned_with_pagination_uses_meta_total_when_total_is_missing(
 
     monkeypatch.setattr(repository_module, "paginate", fake_paginate)
 
-    result = await repository.list_owned(
-        uuid4(),
+    result = await repository.list_all(
         FilterPage.build(
+            trainer_id=uuid4(),
             limit=1,
             offset=0,
             nickname="leaf",
             pokemon_name="bulbasaur",
             discovered=True,
-        ),
+        )
     )
 
     assert [entry.pokemon.name for entry in result.items] == ["bulbasaur"]
@@ -108,14 +110,30 @@ async def test_list_owned_with_pagination_uses_meta_total_when_total_is_missing(
 
 
 @pytest.mark.asyncio
-async def test_find_owned_detail_returns_matching_entity():
+async def test_find_by_returns_matching_entity():
     session = FakeSession()
     session.scalar_result = SimpleNamespace(pokemon=SimpleNamespace(name="bulbasaur"))
     repository = PokedexRepository(session)
 
-    result = await repository.find_owned_detail(uuid4(), "bulbasaur")
+    result = await repository.find_by(trainer_id=uuid4(), name="bulbasaur")
 
     assert result.pokemon.name == "bulbasaur"
+
+
+@pytest.mark.asyncio
+async def test_find_by_applies_id_pokemon_name_and_discovered_filters():
+    session = FakeSession()
+    session.scalar_result = SimpleNamespace(pokemon=SimpleNamespace(name='bulbasaur'))
+    repository = PokedexRepository(session)
+
+    result = await repository.find_by(
+        trainer_id=uuid4(),
+        id=uuid4(),
+        pokemon_name='bulbasaur',
+        discovered=True,
+    )
+
+    assert result.pokemon.name == 'bulbasaur'
 
 
 @pytest.mark.asyncio

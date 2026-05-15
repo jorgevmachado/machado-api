@@ -5,8 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.my_pokemon.schema import MyPokemonSchema
-from app.domain.pokedex.schema import PokedexPokemonSummarySchema, PokedexSchema
+from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
+from app.domain.trainer.pokedex.schema import PokedexPokemonSummarySchema, PokedexSchema
 from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
 from app.domain.trainer.schema import TrainerSchema
 from app.models import ExplorationEventTypeEnum

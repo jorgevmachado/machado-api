@@ -3,15 +3,15 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.domain.my_pokemon.route import (
+from app.domain.trainer.my_pokemon import (
     create_my_pokemon,
     get_my_pokemon,
     get_my_pokemon_filter,
     get_my_pokemon_service,
     list_my_pokemon,
 )
-from app.domain.my_pokemon.schema import CreateMyPokemonSchema
-from app.domain.my_pokemon.service import MyPokemonService
+from app.domain.trainer.my_pokemon import CreateMyPokemonSchema
+from app.domain.trainer.my_pokemon import MyPokemonService
 
 
 def test_get_my_pokemon_service_builds_service():

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.trainer_exploration.repository import TrainerExplorationRepository
+from app.domain.trainer.trainer_exploration import TrainerExplorationRepository
 from app.models.enums import ExplorationEventTypeEnum
 
 
@@ -67,23 +67,23 @@ async def test_create_known_encounters_marks_only_the_active_entry():
 
 
 @pytest.mark.asyncio
-async def test_list_trainer_encounters_returns_loaded_entities():
+async def test_list_all_returns_loaded_entities():
     session = FakeSession()
     session.scalars_result = [SimpleNamespace(id=uuid4())]
     repository = build_repository(session)
 
-    result = await repository.list_trainer_encounters(uuid4())
+    result = await repository.list_all(SimpleNamespace(trainer_id=uuid4()))
 
     assert len(result) == 1
 
 
 @pytest.mark.asyncio
-async def test_find_trainer_encounter_returns_loaded_entity():
+async def test_find_by_returns_loaded_entity():
     session = FakeSession()
     session.scalar_result = SimpleNamespace(id=uuid4())
     repository = build_repository(session)
 
-    result = await repository.find_trainer_encounter(uuid4(), uuid4())
+    result = await repository.find_by(trainer_id=uuid4(), id=uuid4())
 
     assert result is session.scalar_result
 

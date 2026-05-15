@@ -4,8 +4,8 @@ from uuid import uuid4
 import pytest
 from fastapi_pagination import LimitOffsetParams
 
-from app.domain.my_pokemon import repository as repository_module
-from app.domain.my_pokemon.repository import MyPokemonRepository
+from app.domain.trainer.my_pokemon import repository as repository_module
+from app.domain.trainer.my_pokemon import MyPokemonRepository
 from app.shared.schemas import FilterPage
 
 
@@ -34,25 +34,40 @@ def build_repository():
 
 
 @pytest.mark.asyncio
-async def test_list_owned_without_pagination_returns_all_items():
+async def test_list_all_without_pagination_returns_all_items():
     session = FakeSession()
     session.scalars_result = [SimpleNamespace(name="bulbasaur")]
     repository = MyPokemonRepository(session)
 
-    result = await repository.list_owned(uuid4())
+    result = await repository.list_all(FilterPage.build(trainer_id=uuid4()))
 
     assert [item.name for item in result] == ["bulbasaur"]
 
 
 @pytest.mark.asyncio
-async def test_find_owned_detail_returns_scoped_entity():
+async def test_find_by_returns_scoped_entity():
     session = FakeSession()
     session.scalar_result = SimpleNamespace(name="bulbasaur")
     repository = MyPokemonRepository(session)
 
-    result = await repository.find_owned_detail(uuid4(), "bulbasaur")
+    result = await repository.find_by(trainer_id=uuid4(), name="bulbasaur")
 
     assert result.name == "bulbasaur"
+
+
+@pytest.mark.asyncio
+async def test_find_by_applies_id_and_pokemon_name_filters():
+    session = FakeSession()
+    session.scalar_result = SimpleNamespace(name="bulbasaur")
+    repository = MyPokemonRepository(session)
+
+    result = await repository.find_by(
+        trainer_id=uuid4(),
+        id=uuid4(),
+        pokemon_name='bulbasaur',
+    )
+
+    assert result.name == 'bulbasaur'
 
 
 @pytest.mark.asyncio
@@ -120,7 +135,7 @@ async def test_attach_moves_persists_associations():
 
 
 @pytest.mark.asyncio
-async def test_list_owned_with_pagination_returns_custom_page(monkeypatch):
+async def test_list_all_with_pagination_returns_custom_page(monkeypatch):
     session = FakeSession()
     repository = MyPokemonRepository(session)
     item = SimpleNamespace(name="bulbasaur")
@@ -140,9 +155,14 @@ async def test_list_owned_with_pagination_returns_custom_page(monkeypatch):
 
     monkeypatch.setattr(repository_module, "paginate", fake_paginate)
 
-    result = await repository.list_owned(
-        uuid4(),
-        FilterPage.build(limit=1, offset=0, name="bulba", pokemon_name="bulbasaur"),
+    result = await repository.list_all(
+        FilterPage.build(
+            trainer_id=uuid4(),
+            limit=1,
+            offset=0,
+            name="bulba",
+            pokemon_name="bulbasaur",
+        )
     )
 
     assert [owned.name for owned in result.items] == ["bulbasaur"]

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.settings import Settings
+from app.models import Trainer
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", refreshUrl="auth/refresh")
@@ -70,3 +71,19 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+
+async def get_current_trainer(
+    session: AsyncSession = Depends(get_session),
+    token: str = Depends(oauth2_scheme),
+) -> Trainer:
+    user = await get_current_user(session, token)
+
+    trainer = await session.scalar(select(Trainer).where(Trainer.user_id == user.id))
+
+    if not trainer:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail="Trainer not found",
+        )
+
+    return trainer

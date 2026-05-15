@@ -93,12 +93,14 @@ class BaseService[
         self,
         param: str,
         user_request: str | None = None,
+        trainer_id: str | None = None,
     ):
         try:
+            find_by_filters: dict[str, str] = {'trainer_id': trainer_id} if trainer_id else {}
             if is_valid_uuid(param):
-                result = await self.repository.find_by(id=param)
+                result = await self.repository.find_by(id=param, **find_by_filters)
             else:
-                result = await self.repository.find_by(name=param)
+                result = await self.repository.find_by(name=param, **find_by_filters)
 
             if result is None:
                 raise HTTPException(
@@ -123,16 +125,32 @@ class BaseService[
                 user_request=user_request,
             )
 
+    async def _invalidate_cache(
+            self,
+            identifier: str | None = None,
+            trainer_id: str | None = None
+    ) -> None:
+        await self.cache_service.delete_domain()
+        if identifier:
+            cache_key = identifier
+            if trainer_id:
+                cache_key = f"{trainer_id}:{identifier}"
+            await self.cache_service.cache.delete_cache(cache_key)
+
     async def find_one_cached(
         self,
         param: str,
         user_request: str | None = None,
+        trainer_id: str | None = None,
     ):
-        key = self.cache_service.build_key_one(param=param)
+        cache_key = param
+        if trainer_id:
+            cache_key = f"{trainer_id}:{param}"
+        key = self.cache_service.build_key_one(param=cache_key)
         cached = await self.cache_service.get_one(key)
         if cached:
             return cached
-        item = await self.find_one(param, user_request)
+        item = await self.find_one(param, user_request, trainer_id)
         await self.cache_service.set_one(key, item)
         return item
 

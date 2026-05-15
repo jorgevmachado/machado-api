@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "e5f6a7b8c9d0"
 down_revision: Union[str, Sequence[str], None] = "d4e5f6a7b8c9"
@@ -18,6 +19,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    op.execute("""
+                   DO $$ BEGIN
+                       CREATE TYPE explorationeventtypeenum AS ENUM ('WILD_POKEMON', 'POKEBALLS', 'BLANK');
+                   EXCEPTION
+                       WHEN duplicate_object THEN null;
+                   END $$;
+               """)
     op.create_table(
         "trainer_encounters",
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
@@ -88,7 +96,13 @@ def upgrade() -> None:
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
         sa.Column(
             "event_type",
-            sa.Enum("WILD_POKEMON", "POKEBALLS", name="explorationeventtypeenum"),
+            postgresql.ENUM(
+                "WILD_POKEMON",
+                "POKEBALLS",
+                "BLANK",
+                name="explorationeventtypeenum",
+                create_type=False,
+            ),
             nullable=False,
         ),
         sa.Column("payload", sa.JSON(), nullable=False),

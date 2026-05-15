@@ -1,11 +1,11 @@
 from types import SimpleNamespace
 
-from app.domain.my_pokemon.business import (
+from app.domain.trainer.my_pokemon import (
     build_unique_owned_name,
     resolve_effective_nickname,
     select_initial_moves,
 )
-from app.domain.progression.business import build_initial_attributes
+from app.domain.trainer.progression.business import build_initial_attributes
 
 
 def test_resolve_effective_nickname_falls_back_to_base_name():
@@ -28,7 +28,7 @@ def test_select_initial_moves_keeps_distinct_moves_and_limits_to_four(monkeypatc
         SimpleNamespace(name="ember", deleted_at=None),
     ]
     monkeypatch.setattr(
-        "app.domain.my_pokemon.business.random.sample",
+        "app.domain.trainer.my_pokemon.business.random.sample",
         lambda values, limit: values[:limit],
     )
 
@@ -45,7 +45,7 @@ def test_select_initial_moves_keeps_distinct_moves_and_limits_to_four(monkeypatc
 def test_build_initial_attributes_uses_base_stats(monkeypatch):
     rolls = iter([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: next(rolls),
     )
     base_pokemon = SimpleNamespace(

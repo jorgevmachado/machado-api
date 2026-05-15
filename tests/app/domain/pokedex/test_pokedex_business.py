@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from app.domain.pokedex.business import (
+from app.domain.trainer.pokedex.business import (
     build_initial_pokedex_attributes,
     resolve_discovery_state,
 )
@@ -10,7 +10,7 @@ from app.domain.pokedex.business import (
 def test_build_initial_pokedex_attributes_delegates_to_progression(monkeypatch):
     rolls = iter([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: next(rolls),
     )
     base_pokemon = SimpleNamespace(

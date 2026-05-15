@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.trainer_exploration.route import (
+from app.domain.trainer.trainer_exploration import (
     get_trainer_exploration_service,
     get_trainer_home,
     list_trainer_encounters,
@@ -12,11 +12,11 @@ from app.domain.trainer_exploration.route import (
     update_trainer_party,
     walk_trainer_encounter,
 )
-from app.domain.trainer_exploration.schema import (
+from app.domain.trainer.trainer_exploration import (
     SelectTrainerEncounterSchema,
     UpdateTrainerPartySchema,
 )
-from app.domain.trainer_exploration.service import TrainerExplorationService
+from app.domain.trainer.trainer_exploration import TrainerExplorationService
 
 
 def test_get_trainer_exploration_service_builds_service():

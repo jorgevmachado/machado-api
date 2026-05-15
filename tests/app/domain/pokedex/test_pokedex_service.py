@@ -7,7 +7,8 @@ import pytest
 from fastapi import HTTPException
 from fastapi_pagination import LimitOffsetParams
 
-from app.domain.pokedex.service import PokedexService
+from app.domain.trainer.pokedex.service import PokedexService
+from app.models.enums import PokemonStatusEnum
 from app.models.enums import RoleEnum
 from app.core.pagination import CustomLimitOffsetPage
 from app.shared.schemas import FilterPage
@@ -34,14 +35,39 @@ def build_base_pokemon():
         id=uuid4(),
         name="bulbasaur",
         order=1,
-        external_image="https://example.com/bulbasaur.png",
-        hp=45,
+        moves=[],
+        images=None,
+        speed=45,
+        height=7,
+        weight=69,
+        shape=None,
+        status=PokemonStatusEnum.COMPLETE,
         attack=49,
         defense=49,
-        speed=45,
+        is_baby=False,
+        habitat=None,
+        abilities=[],
+        evolutions=[],
+        encounters=[],
+        growth_rate=None,
+        gender_rate=1,
+        is_mythical=False,
+        description=None,
+        is_legendary=False,
+        capture_rate=45,
+        hatch_counter=20,
+        base_happiness=50,
+        external_image="https://example.com/bulbasaur.png",
+        hp=45,
         special_attack=65,
         special_defense=65,
         types=[],
+        base_experience=64,
+        evolution_chain=None,
+        evolves_from_species=None,
+        has_gender_differences=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=None,
         deleted_at=None,
     )
 
@@ -64,13 +90,7 @@ def build_pokedex_entity(trainer_id=None, *, discovered=False):
         discovered_at=datetime.now(timezone.utc) if discovered else None,
         created_at=datetime.now(timezone.utc),
         updated_at=None,
-        pokemon=SimpleNamespace(
-            id=uuid4(),
-            name="bulbasaur",
-            order=1,
-            external_image="https://example.com/bulbasaur.png",
-            types=[],
-        ),
+        pokemon=build_base_pokemon(),
         trainer=SimpleNamespace(
             id=trainer_id,
             user_id=uuid4(),
@@ -100,6 +120,16 @@ class FakeRepository:
     async def list_owned(self, _trainer_id, _page_filter=None):
         return [self.entity]
 
+    async def find_by(self, **kwargs):
+        return await self.find_owned_detail(
+            kwargs.get("trainer_id"),
+            kwargs.get("name") or kwargs.get("pokemon_name"),
+        )
+
+    async def list_all(self, page_filter=None):
+        trainer_id = getattr(page_filter, "trainer_id", None) if page_filter else None
+        return await self.list_owned(trainer_id, page_filter)
+
     async def mark_discovered(self, entity, *, discovered_at):
         entity.discovered = True
         entity.discovered_at = discovered_at
@@ -111,7 +141,7 @@ async def test_initialize_for_trainer_creates_one_entry_per_catalog_pokemon(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository()
@@ -220,6 +250,33 @@ async def test_get_trainer_or_404_raises_when_trainer_does_not_exist():
 
 
 @pytest.mark.asyncio
+async def test_resolve_trainer_returns_trainer_instance_directly():
+    service = PokedexService(FakeRepository(), FakeTrainerService())
+    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), capture_rate=75, pokeballs=1)
+
+    result = await service._resolve_trainer(trainer)
+
+    assert result is trainer
+
+
+@pytest.mark.asyncio
+async def test_list_all_cached_uses_passthrough_branch_when_trainer_id_is_provided():
+    repository = FakeRepository()
+    service = PokedexService(repository, FakeTrainerService())
+    service.list_cache_service.get_list = AsyncMock(return_value=None)
+    service.list_cache_service.set_list = AsyncMock()
+
+    result = await service.list_all_cached(
+        page_filter=FilterPage.build(limit=10, offset=0),
+        user_request='request',
+        trainer_id=str(uuid4()),
+    )
+
+    assert len(result) == 1
+    service.list_cache_service.set_list.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_find_detail_returns_cache_hit_without_querying_repository():
     repository = FakeRepository()
     trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
@@ -309,7 +366,7 @@ async def test_initialize_for_trainer_commits_and_invalidates_cache_when_enabled
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository()
@@ -350,3 +407,14 @@ def test_serialize_page_or_list_returns_custom_page_with_serialized_items():
     result = service._serialize_page_or_list(page)
 
     assert result.items[0].pokemon.name == "bulbasaur"
+
+
+def test_serialize_page_or_list_returns_serialized_list_for_non_paginated_result():
+    service = PokedexService(FakeRepository(), FakeTrainerService())
+    entity = build_pokedex_entity()
+
+    result = service._serialize_page_or_list([entity])
+
+    assert isinstance(result, list)
+    assert result[0].pokemon.name == 'bulbasaur'
+

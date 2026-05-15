@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.pokemon.schema import PokemonSchema
 from app.domain.pokemon.type.schema import PokemonTypeSchema
 
 
@@ -45,5 +46,5 @@ class PokedexSchema(BaseModel):
     discovered_at: datetime | None = None
     created_at: datetime
     updated_at: datetime | None = None
-    pokemon: PokedexPokemonSummarySchema
+    pokemon: PokemonSchema
     trainer: PokedexTrainerSchema

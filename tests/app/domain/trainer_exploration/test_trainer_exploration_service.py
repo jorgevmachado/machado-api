@@ -6,12 +6,12 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.domain.trainer_exploration.schema import (
+from app.domain.trainer.trainer_exploration import (
     SelectTrainerEncounterSchema,
     UpdateTrainerPartySchema,
 )
-from app.domain.trainer_exploration.service import TrainerExplorationService
-from app.models.enums import ExplorationEventTypeEnum, RoleEnum
+from app.domain.trainer.trainer_exploration import TrainerExplorationService
+from app.models.enums import ExplorationEventTypeEnum, PokemonStatusEnum, RoleEnum
 
 
 class FakeSession:
@@ -27,7 +27,38 @@ def build_pokemon(name="bulbasaur"):
         id=uuid4(),
         name=name,
         order=1,
+        hp=45,
+        moves=[],
+        images=None,
+        speed=45,
+        height=7,
+        weight=69,
+        shape=None,
+        status=PokemonStatusEnum.COMPLETE,
+        attack=49,
+        defense=49,
+        is_baby=False,
+        habitat=None,
+        abilities=[],
+        evolutions=[],
+        encounters=[],
+        growth_rate=None,
+        gender_rate=1,
+        is_mythical=False,
+        description=None,
+        is_legendary=False,
+        capture_rate=45,
+        hatch_counter=20,
+        base_happiness=50,
         external_image="https://example.com/pokemon.png",
+        special_attack=65,
+        special_defense=65,
+        base_experience=64,
+        evolution_chain=None,
+        evolves_from_species=None,
+        has_gender_differences=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=None,
         types=[],
         deleted_at=None,
     )
@@ -210,6 +241,18 @@ class FakeRepository:
 
     async def list_trainer_encounters(self, _trainer_id):
         return self.encounters
+
+    async def find_by(self, **kwargs):
+        if kwargs.get("is_active") is True:
+            return await self.find_active_trainer_encounter(kwargs.get("trainer_id"))
+        return await self.find_trainer_encounter(
+            kwargs.get("trainer_id"),
+            kwargs.get("id"),
+        )
+
+    async def list_all(self, page_filter=None):
+        trainer_id = getattr(page_filter, "trainer_id", None) if page_filter else None
+        return await self.list_trainer_encounters(trainer_id)
 
     async def find_active_trainer_encounter(self, _trainer_id):
         return self.active_encounter
@@ -479,11 +522,11 @@ async def test_walk_creates_wild_pokemon_event(monkeypatch):
     repository.active_encounter = active_encounter
     service = build_service(repository, trainer)
     monkeypatch.setattr(
-        "app.domain.trainer_exploration.service.choose_event_type",
+        "app.domain.trainer.trainer_exploration.service.choose_event_type",
         lambda: ExplorationEventTypeEnum.WILD_POKEMON,
     )
     monkeypatch.setattr(
-        "app.domain.trainer_exploration.service.choose_wild_pokemon",
+        "app.domain.trainer.trainer_exploration.service.choose_wild_pokemon",
         lambda _pokemons: pokemon,
     )
 
@@ -503,11 +546,11 @@ async def test_walk_creates_pokeball_event_and_updates_trainer_inventory(monkeyp
     repository.active_encounter = active_encounter
     service = build_service(repository, trainer)
     monkeypatch.setattr(
-        "app.domain.trainer_exploration.service.choose_event_type",
+        "app.domain.trainer.trainer_exploration.service.choose_event_type",
         lambda: ExplorationEventTypeEnum.POKEBALLS,
     )
     monkeypatch.setattr(
-        "app.domain.trainer_exploration.service.build_pokeball_reward",
+        "app.domain.trainer.trainer_exploration.service.build_pokeball_reward",
         lambda: 2,
     )
 
@@ -556,3 +599,14 @@ async def test_get_home_serializes_summary_payload():
     assert result.party[0].my_pokemon.moves[0].pokemon_move_name == "tackle"
     assert len(result.latest_discoveries) == 1
     service.home_cache_service.set_one.assert_awaited_once()
+
+
+def test_to_my_pokemon_schema_serializes_owned_entity():
+    trainer = build_trainer()
+    my_pokemon = build_my_pokemon(trainer)
+
+    result = TrainerExplorationService.to_my_pokemon_schema(my_pokemon)
+
+    assert result.id == my_pokemon.id
+    assert result.moves[0].pokemon_move_name == 'tackle'
+

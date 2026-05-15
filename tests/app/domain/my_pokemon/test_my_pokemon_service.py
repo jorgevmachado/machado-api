@@ -7,8 +7,9 @@ from fastapi_pagination import LimitOffsetParams
 from fastapi import HTTPException
 
 from app.core.pagination import CustomLimitOffsetPage
-from app.domain.my_pokemon.schema import CreateMyPokemonSchema
-from app.domain.my_pokemon.service import MyPokemonService
+from app.domain.trainer.my_pokemon import CreateMyPokemonSchema
+from app.domain.trainer.my_pokemon import MyPokemonService
+from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
 from app.models.enums import RoleEnum
 from app.shared.schemas import FilterPage
 
@@ -101,6 +102,16 @@ class FakeRepository:
     async def list_owned(self, _trainer_id, _page_filter=None):
         return [self.created_entity] if self.created_entity else []
 
+    async def find_by(self, **kwargs):
+        return await self.find_owned_detail(
+            kwargs.get("trainer_id"),
+            kwargs.get("name"),
+        )
+
+    async def list_all(self, page_filter=None):
+        trainer_id = getattr(page_filter, "trainer_id", None) if page_filter else None
+        return await self.list_owned(trainer_id, page_filter)
+
 
 def build_base_pokemon():
     return SimpleNamespace(
@@ -157,7 +168,7 @@ async def test_create_requires_existing_trainer():
 @pytest.mark.asyncio
 async def test_create_persists_owned_pokemon_when_trainer_exists(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(base_pokemon=build_base_pokemon())
@@ -181,7 +192,7 @@ async def test_create_persists_owned_pokemon_when_trainer_exists(monkeypatch):
 @pytest.mark.asyncio
 async def test_create_uses_base_name_as_public_name_when_collision(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(
@@ -389,7 +400,7 @@ async def test_create_owned_for_trainer_raises_internal_error_when_reload_fails(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(base_pokemon=build_base_pokemon())
@@ -413,7 +424,7 @@ async def test_create_owned_for_trainer_does_not_rollback_when_commit_is_disable
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "app.domain.progression.business.random.uniform",
+        "app.domain.trainer.progression.business.random.uniform",
         lambda _min, _max: 1.0,
     )
     repository = FakeRepository(base_pokemon=build_base_pokemon())
@@ -469,3 +480,47 @@ def test_serialize_page_or_list_returns_serialized_custom_page():
 
     assert isinstance(result, CustomLimitOffsetPage)
     assert result.items[0].name == "bulbasaur"
+
+
+def test_serialize_page_or_list_returns_serialized_list_for_non_paginated_result():
+    repository = FakeRepository(base_pokemon=build_base_pokemon())
+    service = MyPokemonService(repository, FakeTrainerService())
+    entity = SimpleNamespace(
+        id=uuid4(),
+        name='bulbasaur',
+        nickname='Leaf',
+        level=1,
+        experience=0,
+        hp=45,
+        max_hp=45,
+        attack=49,
+        defense=49,
+        special_attack=65,
+        special_defense=65,
+        speed=45,
+        captured_at='2026-05-12T00:00:00Z',
+        created_at='2026-05-12T00:00:00Z',
+        updated_at=None,
+        pokemon=repository.base_pokemon,
+        trainer=SimpleNamespace(
+            id=uuid4(),
+            user_id=uuid4(),
+            pokeballs=1,
+            capture_rate=75,
+        ),
+        moves=[],
+    )
+
+    result = service._serialize_page_or_list([entity])
+
+    assert isinstance(result, list)
+    assert result[0].name == 'bulbasaur'
+
+
+def test_filter_active_moves_returns_original_value_when_input_is_not_list():
+    raw_value = {'unexpected': 'shape'}
+
+    result = MyPokemonSchema.filter_active_moves(raw_value)
+
+    assert result is raw_value
+

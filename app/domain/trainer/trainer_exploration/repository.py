@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -46,6 +47,43 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
+    async def list_all(self, page_filter=None) -> list[TrainerEncounter]:
+        trainer_id = getattr(page_filter, "trainer_id", None) if page_filter else None
+        query = (
+            select(TrainerEncounter)
+            .join(TrainerEncounter.pokemon_encounter)
+            .where(
+                TrainerEncounter.deleted_at.is_(None),
+                PokemonEncounter.deleted_at.is_(None),
+            )
+        )
+        if trainer_id is not None:
+            query = query.where(TrainerEncounter.trainer_id == trainer_id)
+        for option in self.relations:
+            query = query.options(option)
+        query = self._apply_order_by(query, page_filter)
+        result = await self.session.scalars(query)
+        return result.all()
+
+    async def find_by(self, **kwargs: Any) -> TrainerEncounter | None:
+        query = select(TrainerEncounter).where(TrainerEncounter.deleted_at.is_(None))
+        for option in self.relations:
+            query = query.options(option)
+
+        trainer_id = kwargs.get("trainer_id")
+        if trainer_id is not None:
+            query = query.where(TrainerEncounter.trainer_id == trainer_id)
+
+        entity_id = kwargs.get("id")
+        if entity_id is not None:
+            query = query.where(TrainerEncounter.id == entity_id)
+
+        is_active = kwargs.get("is_active")
+        if is_active is not None:
+            query = query.where(TrainerEncounter.is_active.is_(is_active))
+
+        return await self.session.scalar(query)
+
     async def list_encounters_for_pokemon(self, pokemon_name: str) -> list[PokemonEncounter]:
         query = (
             select(PokemonEncounter)
@@ -80,54 +118,14 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
         await self.session.flush()
         return entities
 
-    async def list_trainer_encounters(self, trainer_id: UUID) -> list[TrainerEncounter]:
-        query = (
-            select(TrainerEncounter)
-            .join(TrainerEncounter.pokemon_encounter)
-            .where(
-                TrainerEncounter.trainer_id == trainer_id,
-                TrainerEncounter.deleted_at.is_(None),
-                PokemonEncounter.deleted_at.is_(None),
-            )
-            .order_by(PokemonEncounter.order)
-        )
-        for option in self.relations:
-            query = query.options(option)
-        result = await self.session.scalars(query)
-        return result.all()
-
-    async def find_trainer_encounter(
-        self,
-        trainer_id: UUID,
-        encounter_id: UUID,
-    ) -> TrainerEncounter | None:
-        query = (
-            select(TrainerEncounter)
-            .where(
-                TrainerEncounter.trainer_id == trainer_id,
-                TrainerEncounter.id == encounter_id,
-                TrainerEncounter.deleted_at.is_(None),
-            )
-        )
-        for option in self.relations:
-            query = query.options(option)
-        return await self.session.scalar(query)
-
     async def find_active_trainer_encounter(
         self,
         trainer_id: UUID,
     ) -> TrainerEncounter | None:
-        query = (
-            select(TrainerEncounter)
-            .where(
-                TrainerEncounter.trainer_id == trainer_id,
-                TrainerEncounter.is_active.is_(True),
-                TrainerEncounter.deleted_at.is_(None),
-            )
+        return await self.find_by(
+            trainer_id=trainer_id,
+            is_active=True,
         )
-        for option in self.relations:
-            query = query.options(option)
-        return await self.session.scalar(query)
 
     async def deactivate_all_encounters(self, trainer_id: UUID) -> None:
         result = await self.session.scalars(
@@ -280,6 +278,14 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
                 selectinload(Pokedex.pokemon)
                 .selectinload(Pokemon.types)
                 .selectinload(PokemonType.strengths),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.moves),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.images),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.shape),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.habitat),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.abilities),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.evolutions),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.encounters),
+                selectinload(Pokedex.pokemon).selectinload(Pokemon.growth_rate),
                 selectinload(Pokedex.trainer),
             )
             .order_by(Pokedex.discovered_at.desc())

@@ -12,8 +12,14 @@ from app.domain.trainer.schema import (
 )
 from app.domain.trainer.service import TrainerService
 from app.models import User
+from app.domain.trainer.pokedex.route import router as pokedex_router
+from app.domain.trainer.my_pokemon.route import router as my_pokemon_router
+from app.domain.trainer.trainer_exploration.route import router as trainer_exploration_router
 
 router = APIRouter(prefix="/trainer", tags=["trainer"])
+router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
+router.include_router(my_pokemon_router, prefix="/my-pokemon", tags=["My Pokemon"])
+router.include_router(trainer_exploration_router, prefix="/exploration", tags=["Trainer Exploration"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
