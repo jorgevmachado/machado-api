@@ -197,8 +197,9 @@ class PokemonTypeService(BaseService[PokemonTypeRepository, PokemonType]):
         self,
         param: str,
         user_request: str | None = None,
+        trainer_id: str | None = None,
     ):
-        pokemon_type = await super().find_one(param, user_request)
+        pokemon_type = await super().find_one(param=param, user_request=user_request)
         if pokemon_type.status == PokemonStatusEnum.INCOMPLETE:
             if not pokemon_type.description or pokemon_type.description == "":
                 pokemon_type.description = await self.update_description(
