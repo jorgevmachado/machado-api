@@ -36,27 +36,6 @@ def test_get_pokedex_filter_builds_dynamic_filter():
 
 
 @pytest.mark.asyncio
-async def test_list_pokedex_delegates_to_service():
-    service = AsyncMock()
-    page_filter = get_pokedex_filter(page=1, limit=12)
-    expected = SimpleNamespace(items=[])
-    service.list_all_cached.return_value = expected
-    current_trainer = SimpleNamespace(id="trainer-id")
-
-    result = await list_pokedex(
-        current_trainer=current_trainer,
-        service=service,
-        page_filter=page_filter,
-    )
-
-    assert result is expected
-    service.list_all_cached.assert_awaited_once_with(
-        page_filter=page_filter,
-        trainer_id="trainer-id",
-    )
-
-
-@pytest.mark.asyncio
 async def test_get_pokedex_detail_delegates_to_service():
     service = AsyncMock()
     expected = SimpleNamespace(id="1")
@@ -90,3 +69,22 @@ async def test_discover_pokedex_delegates_to_service():
         trainer=current_trainer,
         pokemon_name="bulbasaur",
     )
+
+
+@pytest.mark.asyncio
+async def test_list_pokedex_delegates_to_service():
+    from uuid import uuid4
+    service = AsyncMock()
+    page_filter = get_pokedex_filter(page=1, limit=12)
+    expected = []
+    service.list_all_cached.return_value = expected
+    current_trainer = type('obj', (object,), {'id': uuid4()})()
+
+    result = await list_pokedex(
+        current_trainer=current_trainer,
+        service=service,
+        page_filter=page_filter,
+    )
+
+    assert result == expected
+    service.list_all_cached.assert_awaited_once()

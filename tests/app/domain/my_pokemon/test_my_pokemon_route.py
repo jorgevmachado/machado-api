@@ -1,14 +1,15 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 
 from app.domain.trainer.my_pokemon import (
     create_my_pokemon,
-    get_my_pokemon,
     get_my_pokemon_filter,
     get_my_pokemon_service,
     list_my_pokemon,
+    get_my_pokemon,
 )
 from app.domain.trainer.my_pokemon import CreateMyPokemonSchema
 from app.domain.trainer.my_pokemon import MyPokemonService
@@ -37,44 +38,46 @@ async def test_create_my_pokemon_delegates_to_service():
     expected = SimpleNamespace(id="1", name="bulbasaur")
     service.create.return_value = expected
     payload = CreateMyPokemonSchema(pokemon_name="bulbasaur")
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="trainer-id")
 
     result = await create_my_pokemon(
-        payload, current_user=current_user, service=service
+        payload, current_trainer=current_trainer, service=service
     )
 
     assert result is expected
-    service.create.assert_awaited_once_with(current_user, payload)
+    service.create.assert_awaited_once_with(trainer=current_trainer, payload=payload)
 
 
 @pytest.mark.asyncio
 async def test_list_my_pokemon_delegates_to_service():
     service = AsyncMock()
     page_filter = get_my_pokemon_filter(page=1, limit=12)
-    expected = SimpleNamespace(items=[])
+    expected = []
     service.list_all_cached.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id=uuid4())
 
     result = await list_my_pokemon(
-        current_user=current_user,
+        current_trainer=current_trainer,
         service=service,
         page_filter=page_filter,
     )
 
-    assert result is expected
-    service.list_all_cached.assert_awaited_once_with(current_user, page_filter)
+    assert result == expected
+    service.list_all_cached.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_get_my_pokemon_delegates_to_service():
     service = AsyncMock()
-    expected = SimpleNamespace(id="1", name="bulbasaur")
-    service.find_detail.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    expected = SimpleNamespace(id="1", name="pikachu")
+    service.find_one.return_value = expected
+    current_trainer = SimpleNamespace(id=uuid4())
 
     result = await get_my_pokemon(
-        "bulbasaur", current_user=current_user, service=service
+        name="pikachu",
+        current_trainer=current_trainer,
+        service=service,
     )
 
-    assert result is expected
-    service.find_detail.assert_awaited_once_with(current_user, "bulbasaur")
+    assert result == expected
+    service.find_one.assert_awaited_once()

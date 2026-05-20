@@ -5,6 +5,7 @@ from http import HTTPStatus
 from typing import Annotated
 
 from fastapi import HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache.service import CacheService
 from app.core.exceptions import handle_service_exception
@@ -99,6 +100,10 @@ class PokemonService(BaseService[PokemonRepository, Pokemon]):
             or PokemonEncounterService.from_session(session, self.client)
         )
 
+    @classmethod
+    def from_session(cls, session: AsyncSession):
+        return cls(PokemonRepository(session))
+
     async def _ensure_initial_catalog(self) -> None:
         if await self.repository.has_any():
             return
@@ -134,7 +139,7 @@ class PokemonService(BaseService[PokemonRepository, Pokemon]):
         page_filter: Annotated[FilterPage, Query()] = None,
         user_request: str | None = None,
         trainer_id: str | None = None,
-    ) -> list[PokemonSchema] | CustomLimitOffsetPage[PokemonSchema] | None:
+    ) -> list[Pokemon] | CustomLimitOffsetPage[Pokemon] | None:
         try:
             await self._ensure_initial_catalog()
             result = await self.repository.list_all(page_filter=page_filter)

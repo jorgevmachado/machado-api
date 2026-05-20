@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import random
 import re
 import unicodedata
-
-from app.models.pokemon_move import PokemonMove
 
 STARTER_POKEMON_NAMES = {"bulbasaur", "charmander", "squirtle"}
 DEFAULT_TRAINER_POKEBALLS = 1
@@ -31,19 +28,3 @@ def build_unique_owned_name(base_slug: str, existing_names: set[str]) -> str:
     while f"{base_slug}-{suffix}" in existing_names:
         suffix += 1
     return f"{base_slug}-{suffix}"
-
-
-def select_initial_moves(moves: list[PokemonMove]) -> list[PokemonMove]:
-    unique_moves: list[PokemonMove] = []
-    seen_names: set[str] = set()
-
-    for move in moves:
-        if move.deleted_at is not None or move.name in seen_names:
-            continue
-        seen_names.add(move.name)
-        unique_moves.append(move)
-
-    if len(unique_moves) <= 4:
-        return unique_moves
-
-    return random.sample(unique_moves, 4)

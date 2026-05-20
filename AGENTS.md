@@ -150,3 +150,68 @@ make lint && make test
 - [ ] Logs/contexto adicionados
 - [ ] Testes verdes
 - [ ] Migration criada/revisada se DB mudou
+
+## Repository boundaries
+
+- Cada `repository.py` deve acessar somente os models pertencentes ao próprio domain.
+- É proibido importar ou consultar models de outros domains dentro de um repository.
+- Exemplo proibido: `domain/pokedex/repository.py` importar ou consultar `Pokemon` de `domain/pokemon`.
+- Quando um domain precisar de dados de outro domain, a integração deve acontecer na camada de service/use case, usando o service/repository público do outro domain.
+- O repository deve ser responsável apenas pela persistência do agregado/modelo principal daquele domain.
+- Joins entre tabelas de domains diferentes só podem existir se forem explicitamente aprovados na especificação da feature.
+- Antes de implementar qualquer método novo em um repository, sempre verificar primeiro se o `BaseRepository` já possui uma implementação reutilizável.
+- O desenvolvedor/IA deve reutilizar métodos existentes do `BaseRepository` sempre que possível.
+- É proibido duplicar lógica já existente no `BaseRepository`.
+- Só é permitido criar um novo método no repository caso:
+  - o comportamento realmente não exista no `BaseRepository`
+  - a necessidade seja específica do domain
+  - não seja possível parametrizar/reaproveitar um método já existente 
+  - Antes de criar novos métodos, analisar especialmente operações comuns como:
+    - `total`
+    - `save`
+    - `update`
+    - `list_all`
+    - `find_by` 
+    - `soft_delete`
+    - `exists` 
+    - filtros genéricos
+    - ordenação
+    - eager loading
+- Sempre preferir extensão/composição do `BaseRepository` ao invés de duplicação.
+
+## Import rules
+
+- Todos os imports devem ficar obrigatoriamente no topo do arquivo.
+- É proibido realizar imports dentro de:
+  - funções
+  - métodos
+  - condicionais
+  - loops
+  - context managers
+  - blocos try/except
+- Nunca utilizar lazy imports ou dynamic imports para resolver dependências entre domains.
+- Nunca escrever imports inline como:
+```python
+if trainer_service is None:
+    from app.domain.trainer.service import TrainerService
+```
+- O correto é sempre importar do topo do arquivo:
+ ```python
+    from app.domain.trainer.service import TrainerService
+```
+
+## Workflow obrigatório
+
+Ao criar ou alterar um repository:
+
+1. Ler o `BaseRepository`
+2. Identificar métodos reutilizáveis
+3. Reutilizar os métodos existentes
+4. Somente criar novos métodos se realmente necessário
+
+Ao criar ou alterar um service:
+
+1. Ler o `BaseService`
+2. Identificar métodos reutilizáveis
+3. Reutilizar os métodos existentes
+4. Somente criar novos métodos se realmente necessário

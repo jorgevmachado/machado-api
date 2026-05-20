@@ -52,7 +52,8 @@ async def list_pokedex(
         service: Annotated[PokedexService, Depends(get_pokedex_service)],
         page_filter: Annotated[FilterPage, Depends(get_pokedex_filter)],
 ):
-    return await service.list_all_cached(page_filter=page_filter, trainer_id=str(current_trainer.id))
+    filters = FilterPage.build(page_filter, trainer_id=str(current_trainer.id))
+    return await service.list_all_cached(page_filter=filters)
 
 
 @router.get("/{param}", response_model=PokedexSchema, status_code=HTTPStatus.OK)

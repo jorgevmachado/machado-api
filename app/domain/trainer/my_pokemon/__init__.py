@@ -1,7 +1,6 @@
 from app.domain.trainer.my_pokemon.business import (
     build_unique_owned_name,
     resolve_effective_nickname,
-    select_initial_moves,
     slugify_name,
 )
 from app.domain.trainer.my_pokemon.repository import MyPokemonRepository
@@ -23,7 +22,6 @@ from app.domain.trainer.my_pokemon.service import MyPokemonService
 __all__ = [
     "build_unique_owned_name",
     "resolve_effective_nickname",
-    "select_initial_moves",
     "slugify_name",
     "MyPokemonRepository",
     "create_my_pokemon",

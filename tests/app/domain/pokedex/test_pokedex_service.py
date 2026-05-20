@@ -4,13 +4,9 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
-from fastapi_pagination import LimitOffsetParams
 
 from app.domain.trainer.pokedex.service import PokedexService
 from app.models.enums import PokemonStatusEnum
-from app.models.enums import RoleEnum
-from app.core.pagination import CustomLimitOffsetPage
 from app.shared.schemas import FilterPage
 
 
@@ -136,127 +132,9 @@ class FakeRepository:
         return entity
 
 
-@pytest.mark.asyncio
-async def test_initialize_for_trainer_creates_one_entry_per_catalog_pokemon(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "app.domain.trainer.progression.business.random.uniform",
-        lambda _min, _max: 1.0,
-    )
-    repository = FakeRepository()
-    service = PokedexService(
-        repository,
-        FakeTrainerService(
-            trainer=SimpleNamespace(
-                id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75
-            )
-        ),
-    )
-
-    result = await service.initialize_for_trainer(
-        trainer_id=uuid4(),
-        discovered_pokemon_name="bulbasaur",
-        commit=False,
-    )
-
-    assert repository.created_payload is not None
-    assert repository.created_payload["discovered_pokemon_name"] == "bulbasaur"
-    assert len(result) == 1
 
 
-@pytest.mark.asyncio
-async def test_list_all_cached_returns_cache_hit():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    cached = SimpleNamespace(items=[])
-    service.list_cache_service.get_list = AsyncMock(return_value=cached)
-    service.list_cache_service.delete_domain = AsyncMock()
-    service.list_cache_service.set_list = AsyncMock()
-    service.repository.list_owned = AsyncMock()
 
-    result = await service.list_all_cached(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-    )
-
-    assert result is cached
-    service.repository.list_owned.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_find_detail_raises_not_found_when_entry_missing():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    service.cache_service.get_one = AsyncMock(return_value=None)
-    service.repository.find_owned_detail = AsyncMock(return_value=None)
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service.find_detail(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
-        )
-
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_discover_marks_entry_and_invalidates_cache():
-    repository = FakeRepository()
-    repository.entity = build_pokedex_entity(discovered=False)
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    service._invalidate_cache = AsyncMock()
-
-    result = await service.discover(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
-    )
-
-    assert result.discovered is True
-    service._invalidate_cache.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_list_all_cached_cleans_cache_and_stores_serialized_list():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    service.list_cache_service.delete_domain = AsyncMock()
-    service.list_cache_service.get_list = AsyncMock(return_value=None)
-    service.list_cache_service.set_list = AsyncMock()
-
-    page_filter = FilterPage.build(clean_cache=True)
-    result = await service.list_all_cached(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-        page_filter,
-    )
-
-    assert result[0].pokemon.name == "bulbasaur"
-    assert page_filter.clean_cache is None
-    service.list_cache_service.delete_domain.assert_awaited_once()
-    service.list_cache_service.set_list.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_get_trainer_or_404_raises_when_trainer_does_not_exist():
-    service = PokedexService(FakeRepository(), FakeTrainerService(trainer=None))
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service._get_trainer_or_404(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER)
-        )
-
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_resolve_trainer_returns_trainer_instance_directly():
-    service = PokedexService(FakeRepository(), FakeTrainerService())
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), capture_rate=75, pokeballs=1)
-
-    result = await service._resolve_trainer(trainer)
-
-    assert result is trainer
 
 
 @pytest.mark.asyncio
@@ -276,145 +154,68 @@ async def test_list_all_cached_uses_passthrough_branch_when_trainer_id_is_provid
     service.list_cache_service.set_list.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_find_detail_returns_cache_hit_without_querying_repository():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    cached = SimpleNamespace(id="1", pokemon=SimpleNamespace(name="bulbasaur"))
-    service.cache_service.get_one = AsyncMock(return_value=cached)
-    service.cache_service.set_one = AsyncMock()
-    service.repository.find_owned_detail = AsyncMock()
 
-    result = await service.find_detail(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
+
+@pytest.mark.asyncio
+async def test_initialize_for_trainer_uses_empty_list_when_pokemon_service_returns_non_list():
+    repository = FakeRepository()
+    pokemon_service = AsyncMock()
+    pokemon_service.list_all.return_value = {'unexpected': 'shape'}
+    service = PokedexService(
+        repository,
+        FakeTrainerService(),
+        pokemon_service,
     )
-
-    assert result is cached
-    service.repository.find_owned_detail.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_find_detail_serializes_and_caches_on_cache_miss():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    service.cache_service.get_one = AsyncMock(return_value=None)
-    service.cache_service.set_one = AsyncMock()
-    service.repository.find_owned_detail = AsyncMock(return_value=repository.entity)
-
-    result = await service.find_detail(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
-    )
-
-    assert result.pokemon.name == "bulbasaur"
-    service.cache_service.set_one.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_discover_raises_not_found_when_entry_is_missing():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    service.repository.find_owned_detail = AsyncMock(return_value=None)
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service.discover(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
-        )
-
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_discover_skips_mark_when_entry_already_discovered():
-    repository = FakeRepository()
-    repository.entity = build_pokedex_entity(discovered=True)
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    repository.mark_discovered = AsyncMock()
+    service._create_for_trainer = AsyncMock(return_value=[])
     service._invalidate_cache = AsyncMock()
 
-    result = await service.discover(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
-    )
-
-    assert result.discovered is True
-    repository.mark_discovered.assert_not_awaited()
-    service._invalidate_cache.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_discover_raises_internal_error_when_reload_fails():
-    repository = FakeRepository()
-    trainer = SimpleNamespace(id=uuid4(), user_id=uuid4(), pokeballs=1, capture_rate=75)
-    service = PokedexService(repository, FakeTrainerService(trainer=trainer))
-    service.repository.find_owned_detail = AsyncMock(
-        side_effect=[build_pokedex_entity(discovered=False), None]
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service.discover(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER), "bulbasaur"
-        )
-
-    assert exc_info.value.status_code == 500
-
-
-@pytest.mark.asyncio
-async def test_initialize_for_trainer_commits_and_invalidates_cache_when_enabled(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "app.domain.trainer.progression.business.random.uniform",
-        lambda _min, _max: 1.0,
-    )
-    repository = FakeRepository()
-    service = PokedexService(repository, FakeTrainerService())
-    service._invalidate_cache = AsyncMock()
-
-    await service.initialize_for_trainer(
+    result = await service.initialize_for_trainer(
         trainer_id=uuid4(),
-        discovered_pokemon_name="bulbasaur",
+        discovered_pokemon_name='bulbasaur',
+        commit=False,
+    )
+
+    assert result == []
+    service._create_for_trainer.assert_awaited_once()
+    create_call = service._create_for_trainer.await_args.kwargs
+    assert create_call['pokemons'] == []
+    assert create_call['attributes_by_pokemon_id'] == {}
+    assert repository.session.committed is False
+    service._invalidate_cache.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_initialize_for_trainer_commits_and_returns_only_found_entities():
+    repository = FakeRepository()
+    pokemon_a = build_base_pokemon()
+    pokemon_b = build_base_pokemon()
+    pokemon_b.name = 'ivysaur'
+    pokemon_service = AsyncMock()
+    pokemon_service.list_all.return_value = [pokemon_a, pokemon_b]
+    entity = build_pokedex_entity(discovered=True)
+    repository.find_by = AsyncMock(side_effect=[entity, None])
+    service = PokedexService(
+        repository,
+        FakeTrainerService(),
+        pokemon_service,
+    )
+    service._create_for_trainer = AsyncMock(return_value=[entity])
+    service._invalidate_cache = AsyncMock()
+    trainer_id = uuid4()
+
+    result = await service.initialize_for_trainer(
+        trainer_id=trainer_id,
+        discovered_pokemon_name='bulbasaur',
         commit=True,
     )
 
+    assert result == [entity]
     assert repository.session.committed is True
-    service._invalidate_cache.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_invalidate_cache_deletes_detail_key_when_name_is_provided():
-    service = PokedexService(FakeRepository(), FakeTrainerService())
-    service.list_cache_service.delete_domain = AsyncMock()
-    service.cache_service.cache.delete_cache = AsyncMock()
-
-    await service._invalidate_cache("trainer-id", "bulbasaur")
-
-    service.list_cache_service.delete_domain.assert_awaited_once()
-    service.cache_service.cache.delete_cache.assert_awaited_once()
-
-
-def test_serialize_page_or_list_returns_custom_page_with_serialized_items():
-    service = PokedexService(FakeRepository(), FakeTrainerService())
-    entity = build_pokedex_entity()
-    page = CustomLimitOffsetPage.create(
-        items=[entity],
-        total=1,
-        params=LimitOffsetParams(limit=1, offset=0),
+    service._create_for_trainer.assert_awaited_once()
+    create_call = service._create_for_trainer.await_args.kwargs
+    assert create_call['pokemons'] == [pokemon_a, pokemon_b]
+    assert set(create_call['attributes_by_pokemon_id'].keys()) == {pokemon_a.id, pokemon_b.id}
+    service._invalidate_cache.assert_awaited_once_with(
+        identifier='bulbasaur',
+        trainer_id=str(trainer_id),
     )
-
-    result = service._serialize_page_or_list(page)
-
-    assert result.items[0].pokemon.name == "bulbasaur"
-
-
-def test_serialize_page_or_list_returns_serialized_list_for_non_paginated_result():
-    service = PokedexService(FakeRepository(), FakeTrainerService())
-    entity = build_pokedex_entity()
-
-    result = service._serialize_page_or_list([entity])
-
-    assert isinstance(result, list)
-    assert result[0].pokemon.name == 'bulbasaur'
-

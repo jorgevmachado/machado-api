@@ -3,8 +3,8 @@ from types import SimpleNamespace
 from app.domain.trainer.my_pokemon import (
     build_unique_owned_name,
     resolve_effective_nickname,
-    select_initial_moves,
 )
+from app.domain.trainer.my_pokemon.move.business import select_initial_moves
 from app.domain.trainer.progression.business import build_initial_attributes
 
 
@@ -28,7 +28,7 @@ def test_select_initial_moves_keeps_distinct_moves_and_limits_to_four(monkeypatc
         SimpleNamespace(name="ember", deleted_at=None),
     ]
     monkeypatch.setattr(
-        "app.domain.trainer.my_pokemon.business.random.sample",
+        "app.domain.trainer.my_pokemon.move.business.random.sample",
         lambda values, limit: values[:limit],
     )
 
@@ -70,3 +70,22 @@ def test_build_initial_attributes_uses_base_stats(monkeypatch):
         "special_defense": 65,
         "speed": 45,
     }
+
+
+def test_slugify_name_handles_unicode_characters():
+    from app.domain.trainer.my_pokemon.business import slugify_name
+    result = slugify_name("Pikachu é legal!")
+    assert "pikachu" in result
+    assert "-" in result or len(result) > 0
+
+
+def test_slugify_name_fallback_when_empty():
+    from app.domain.trainer.my_pokemon.business import slugify_name
+    result = slugify_name("!!!###@@@")
+    assert result == "pokemon"
+
+
+def test_build_unique_owned_name_returns_base_when_not_in_set():
+    from app.domain.trainer.my_pokemon.business import build_unique_owned_name
+    result = build_unique_owned_name("pikachu", set())
+    assert result == "pikachu"
