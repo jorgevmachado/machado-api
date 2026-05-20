@@ -131,6 +131,9 @@ class FakeRepository:
         entity.discovered_at = discovered_at
         return entity
 
+    async def list_latest_discoveries(self, trainer_id, limit=3):
+        return [self.entity]
+
 
 
 
@@ -218,4 +221,20 @@ async def test_initialize_for_trainer_commits_and_returns_only_found_entities():
     service._invalidate_cache.assert_awaited_once_with(
         identifier='bulbasaur',
         trainer_id=str(trainer_id),
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_latest_discoveries_delegates_to_repository():
+    repository = FakeRepository()
+    repository.list_latest_discoveries = AsyncMock(return_value=[repository.entity])
+    service = PokedexService(repository, FakeTrainerService())
+    trainer_id = uuid4()
+
+    result = await service.list_latest_discoveries(trainer_id, limit=5)
+
+    assert result == [repository.entity]
+    repository.list_latest_discoveries.assert_awaited_once_with(
+        trainer_id=trainer_id,
+        limit=5,
     )

@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache.service import CacheService
 from app.core.exceptions import handle_service_exception
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
@@ -17,9 +18,13 @@ from app.domain.trainer.my_pokemon.business import (
     STARTER_POKEMON_NAMES,
 )
 from app.domain.trainer.my_pokemon.repository import MyPokemonRepository
+from app.domain.trainer.pokedex.schema import PokedexSchema
 from app.domain.trainer.pokedex.repository import PokedexRepository
 from app.domain.trainer.repository import TrainerRepository
 from app.domain.trainer.trainer_exploration.repository import TrainerExplorationRepository
+from app.domain.trainer.trainer_exploration.schema import TrainerHomeSchema
+from app.domain.trainer.trainer_party.repository import TrainerPartyRepository
+from app.domain.trainer.trainer_party.service import TrainerPartyService
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
     TrainerOnboardingResponseSchema,
@@ -44,6 +49,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         my_pokemon_service: MyPokemonService | None = None,
         pokedex_service: PokedexService | None = None,
         trainer_exploration_service: TrainerExplorationService | None = None,
+        trainer_party_service: TrainerPartyService | None = None,
     ) -> None:
         super().__init__(
             alias="Trainer",
@@ -52,6 +58,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 logger=logger, service="TrainerService", operation="trainer"
             ),
             schema_class=TrainerSchema,
+            cache_prefix="trainer",
         )
         if my_pokemon_service is None:
             from app.domain.trainer.my_pokemon import MyPokemonService
@@ -74,16 +81,34 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 TrainerExplorationRepository(repository.session),
                 trainer_service=self,
             )
+        if trainer_party_service is None:
+            trainer_party_service = TrainerPartyService(
+                TrainerPartyRepository(repository.session),
+                trainer_service=self,
+            )
         self.my_pokemon_service = my_pokemon_service
         self.pokedex_service = pokedex_service
         self.trainer_exploration_service = trainer_exploration_service
+        self.trainer_party_service = trainer_party_service
+        self.home_cache_service = CacheService(
+            alias="TrainerHome",
+            prefix="trainer",
+            logger_params=self.logger_params,
+            schema_class=TrainerHomeSchema,
+        )
 
     @classmethod
     def from_session(cls, session: AsyncSession):
         return cls(TrainerRepository(session))
 
+    def _home_key(self, trainer_id: str) -> str:
+        return self.home_cache_service.cache.build_key("trainer", "home", trainer_id)
+
     async def get_by_user_id(self, user_id: UUID) -> Trainer | None:
         return await self.repository.find_by(user_id=user_id)
+
+    async def invalidate_home_cache(self, trainer_id: str) -> None:
+        await self.home_cache_service.cache.delete_cache(self._home_key(trainer_id))
 
     async def create(
         self,
@@ -180,3 +205,30 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 operation="onboard",
                 raise_exception=True,
             )
+
+    async def get_home(self, current_user: User) -> TrainerHomeSchema:
+        trainer = await self.get_by_user_id(current_user.id)
+        if trainer is None:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail="Trainer not found",
+            )
+        key = self._home_key(str(trainer.id))
+        cached = await self.home_cache_service.get_one(key)
+        if cached:
+            return cached
+        active_encounter = (
+            await self.trainer_exploration_service.get_active_encounter_by_trainer_id(trainer.id)
+        )
+        party = await self.trainer_party_service.get_party_by_trainer_id(trainer.id)
+        latest_discoveries = await self.pokedex_service.list_latest_discoveries(trainer.id)
+        serialized = TrainerHomeSchema(
+            trainer=TrainerSchema.model_validate(trainer),
+            active_encounter=active_encounter,
+            party=party,
+            latest_discoveries=[
+                PokedexSchema.model_validate(entry) for entry in latest_discoveries
+            ],
+        )
+        await self.home_cache_service.set_one(key, serialized)
+        return serialized

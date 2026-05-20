@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,3 +28,26 @@ class PokedexRepository(BaseRepository[Pokedex]):
 
     def __init__(self, session: AsyncSession):
         super().__init__(session)
+
+    async def list_latest_discoveries(
+        self,
+        trainer_id,
+        limit: int = 3,
+    ) -> list[Pokedex]:
+        query = (
+            select(Pokedex)
+            .join(Pokedex.pokemon)
+            .where(
+                Pokedex.trainer_id == trainer_id,
+                Pokedex.deleted_at.is_(None),
+                Pokedex.discovered.is_(True),
+                Pokedex.discovered_at.is_not(None),
+                Pokemon.deleted_at.is_(None),
+            )
+            .order_by(Pokedex.discovered_at.desc())
+            .limit(limit)
+        )
+        for option in self.relations:
+            query = query.options(option)
+        result = await self.session.scalars(query)
+        return result.all()

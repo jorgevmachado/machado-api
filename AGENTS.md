@@ -215,3 +215,19 @@ Ao criar ou alterar um service:
 2. Identificar métodos reutilizáveis
 3. Reutilizar os métodos existentes
 4. Somente criar novos métodos se realmente necessário
+
+## Trainer Boundaries
+
+- `app/domain/trainer/trainer_party/` é o domínio canônico para party.
+- Endpoints canônicos de party:
+  - `GET /trainer/party`
+  - `PUT /trainer/party`
+- `TrainerPartyService` é responsável por validar limite/duplicidade, carregar `MyPokemon`, aplicar soft delete da party ativa e invalidar `trainer:party:{trainer_id}` e `trainer:home:{trainer_id}`.
+
+- `app/domain/trainer/service.py` é o agregador canônico da Home.
+- Endpoint canônico de home:
+  - `GET /trainer/home`
+- `TrainerService.get_home()` deve apenas orquestrar `trainer_party_service.get_party_by_trainer_id()`, `trainer_exploration_service.get_active_encounter_by_trainer_id()` e `pokedex_service.list_latest_discoveries()`.
+
+- `app/domain/trainer/trainer_exploration/` deve permanecer restrito a encounter/event/walk.
+- Rotas antigas `/trainer/exploration/home` e `/trainer/exploration/party` não são mais canônicas e não devem voltar sem spec explícito.

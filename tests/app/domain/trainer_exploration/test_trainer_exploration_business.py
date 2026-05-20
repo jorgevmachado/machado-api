@@ -4,7 +4,6 @@ import pytest
 from fastapi import HTTPException
 
 from app.domain.trainer.trainer_exploration import (
-    MAX_PARTY_SIZE,
     POKEBALL_REWARD_MAX,
     POKEBALL_REWARD_MIN,
     WILD_EVENT_THRESHOLD,
@@ -12,7 +11,6 @@ from app.domain.trainer.trainer_exploration import (
     choose_event_type,
     choose_wild_pokemon,
     resolve_initial_active_encounter,
-    validate_party_selection,
 )
 from app.models.enums import ExplorationEventTypeEnum
 
@@ -30,20 +28,6 @@ def test_resolve_initial_active_encounter_uses_lowest_order():
     result = resolve_initial_active_encounter(encounters)
 
     assert result.id == "1"
-
-
-def test_validate_party_selection_rejects_more_than_max_size():
-    with pytest.raises(HTTPException) as exc_info:
-        validate_party_selection(list(range(MAX_PARTY_SIZE + 1)))
-
-    assert exc_info.value.status_code == 400
-
-
-def test_validate_party_selection_rejects_duplicates():
-    with pytest.raises(HTTPException) as exc_info:
-        validate_party_selection(["1", "1"])
-
-    assert exc_info.value.status_code == 400
 
 
 def test_choose_event_type_returns_wild_event_below_threshold(monkeypatch):

@@ -10,6 +10,8 @@ from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
     TrainerOnboardingResponseSchema,
 )
+from app.domain.trainer.trainer_exploration.schema import TrainerHomeSchema
+from app.domain.trainer.trainer_party.route import router as trainer_party_router
 from app.domain.trainer.service import TrainerService
 from app.models import User
 from app.domain.trainer.pokedex.route import router as pokedex_router
@@ -19,6 +21,7 @@ from app.domain.trainer.trainer_exploration.route import router as trainer_explo
 router = APIRouter(prefix="/trainer", tags=["trainer"])
 router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
 router.include_router(my_pokemon_router, prefix="/my-pokemon", tags=["My Pokemon"])
+router.include_router(trainer_party_router, tags=["Trainer Party"])
 router.include_router(trainer_exploration_router, prefix="/exploration", tags=["Trainer Exploration"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -26,6 +29,14 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 def get_trainer_service(session: Session) -> TrainerService:
     return TrainerService.from_session(session)
+
+
+@router.get("/home", response_model=TrainerHomeSchema, status_code=HTTPStatus.OK)
+async def get_trainer_home(
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[TrainerService, Depends(get_trainer_service)],
+):
+    return await service.get_home(current_user)
 
 
 @router.post(

@@ -127,6 +127,16 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
             )
         return result
 
+    async def list_latest_discoveries(
+            self,
+            trainer_id: UUID,
+            limit: int = 3,
+    ) -> list[Pokedex]:
+        return await self.repository.list_latest_discoveries(
+            trainer_id=trainer_id,
+            limit=limit,
+        )
+
     async def _create_for_trainer(
             self,
             *,

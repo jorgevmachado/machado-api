@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -115,70 +114,6 @@ async def test_deactivate_all_encounters_clears_active_flags():
 
 
 @pytest.mark.asyncio
-async def test_list_active_party_returns_loaded_entities():
-    session = FakeSession()
-    session.scalars_result = [SimpleNamespace(id=uuid4())]
-    repository = build_repository(session)
-
-    result = await repository.list_active_party(uuid4())
-
-    assert len(result) == 1
-
-
-@pytest.mark.asyncio
-async def test_soft_delete_active_party_marks_rows_inactive():
-    session = FakeSession()
-    timestamp = datetime.now(timezone.utc)
-    session.scalars_result = [
-        SimpleNamespace(is_active=True, deleted_at=None),
-        SimpleNamespace(is_active=True, deleted_at=None),
-    ]
-    repository = build_repository(session)
-
-    await repository.soft_delete_active_party(uuid4(), timestamp)
-
-    assert [entry.is_active for entry in session.scalars_result] == [False, False]
-    assert [entry.deleted_at for entry in session.scalars_result] == [timestamp, timestamp]
-    assert session.flushed is True
-
-
-@pytest.mark.asyncio
-async def test_list_owned_my_pokemon_returns_empty_without_ids():
-    repository = build_repository()
-
-    result = await repository.list_owned_my_pokemon(uuid4(), [])
-
-    assert result == []
-
-
-@pytest.mark.asyncio
-async def test_list_owned_my_pokemon_returns_loaded_entities():
-    session = FakeSession()
-    session.scalars_result = [SimpleNamespace(id=uuid4())]
-    repository = build_repository(session)
-
-    result = await repository.list_owned_my_pokemon(uuid4(), [uuid4()])
-
-    assert len(result) == 1
-
-
-@pytest.mark.asyncio
-async def test_create_party_creates_slots_in_order():
-    session = FakeSession()
-    repository = build_repository(session)
-    trainer_id = uuid4()
-    my_pokemons = [SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())]
-
-    result = await repository.create_party(
-        trainer_id=trainer_id,
-        my_pokemons=my_pokemons,
-    )
-
-    assert [entry.slot for entry in result] == [1, 2]
-    assert session.flushed is True
-
-
-@pytest.mark.asyncio
 async def test_create_event_persists_payload_and_type():
     session = FakeSession()
     repository = build_repository(session)
@@ -192,25 +127,3 @@ async def test_create_event_persists_payload_and_type():
     assert result.event_type == ExplorationEventTypeEnum.POKEBALLS
     assert result.payload == {"pokeballs_found": 2}
     assert session.flushed is True
-
-
-@pytest.mark.asyncio
-async def test_find_trainer_returns_loaded_entity():
-    session = FakeSession()
-    session.scalar_result = SimpleNamespace(id=uuid4())
-    repository = build_repository(session)
-
-    result = await repository.find_trainer(uuid4())
-
-    assert result is session.scalar_result
-
-
-@pytest.mark.asyncio
-async def test_list_latest_discoveries_returns_loaded_entities():
-    session = FakeSession()
-    session.scalars_result = [SimpleNamespace(id=uuid4())]
-    repository = build_repository(session)
-
-    result = await repository.list_latest_discoveries(uuid4(), limit=3)
-
-    assert len(result) == 1

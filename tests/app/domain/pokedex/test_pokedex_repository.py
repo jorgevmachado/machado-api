@@ -83,3 +83,15 @@ async def test_find_by_applies_id_pokemon_name_and_discovered_filters():
     )
 
     assert result.pokemon.name == 'bulbasaur'
+
+
+@pytest.mark.asyncio
+async def test_list_latest_discoveries_returns_loaded_entities():
+    session = FakeSession()
+    session.scalars_result = [SimpleNamespace(pokemon=SimpleNamespace(name="bulbasaur"))]
+    repository = PokedexRepository(session)
+
+    result = await repository.list_latest_discoveries(uuid4(), limit=3)
+
+    assert len(result) == 1
+    assert result[0].pokemon.name == "bulbasaur"

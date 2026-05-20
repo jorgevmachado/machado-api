@@ -6,16 +6,11 @@ import pytest
 
 from app.domain.trainer.trainer_exploration import (
     get_trainer_exploration_service,
-    get_trainer_home,
     list_trainer_encounters,
     select_active_trainer_encounter,
-    update_trainer_party,
     walk_trainer_encounter,
 )
-from app.domain.trainer.trainer_exploration import (
-    SelectTrainerEncounterSchema,
-    UpdateTrainerPartySchema,
-)
+from app.domain.trainer.trainer_exploration import SelectTrainerEncounterSchema
 from app.domain.trainer.trainer_exploration import TrainerExplorationService
 
 
@@ -23,19 +18,6 @@ def test_get_trainer_exploration_service_builds_service():
     service = get_trainer_exploration_service(AsyncMock())
 
     assert isinstance(service, TrainerExplorationService)
-
-
-@pytest.mark.asyncio
-async def test_get_trainer_home_delegates_to_service():
-    service = AsyncMock()
-    expected = SimpleNamespace(trainer=SimpleNamespace(id="trainer-1"))
-    service.get_home.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
-
-    result = await get_trainer_home(current_user=current_user, service=service)
-
-    assert result is expected
-    service.get_home.assert_awaited_once_with(current_user)
 
 
 @pytest.mark.asyncio
@@ -67,24 +49,6 @@ async def test_select_active_trainer_encounter_delegates_to_service():
 
     assert result is expected
     service.select_active_encounter.assert_awaited_once_with(current_user, payload)
-
-
-@pytest.mark.asyncio
-async def test_update_trainer_party_delegates_to_service():
-    service = AsyncMock()
-    expected = [SimpleNamespace(id="party-1")]
-    service.update_party.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
-    payload = UpdateTrainerPartySchema(my_pokemon_ids=[uuid4()])
-
-    result = await update_trainer_party(
-        payload,
-        current_user=current_user,
-        service=service,
-    )
-
-    assert result is expected
-    service.update_party.assert_awaited_once_with(current_user, payload)
 
 
 @pytest.mark.asyncio

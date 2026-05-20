@@ -3,34 +3,26 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache.service import CacheService
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
-from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
-from app.domain.trainer.pokedex.schema import PokedexSchema
-from app.domain.trainer.schema import TrainerSchema
 from app.domain.trainer.trainer_exploration.business import (
     build_pokeball_reward,
     choose_event_type,
     choose_wild_pokemon,
     resolve_initial_active_encounter,
-    validate_party_selection,
 )
 from app.domain.trainer.trainer_exploration.repository import TrainerExplorationRepository
 from app.domain.trainer.trainer_exploration.schema import (
     ExplorationEventSchema,
     SelectTrainerEncounterSchema,
     TrainerEncounterSchema,
-    TrainerHomeSchema,
-    TrainerPartyMemberSchema,
-    UpdateTrainerPartySchema,
 )
-from app.models import ExplorationEventTypeEnum, MyPokemon, Trainer, TrainerEncounter, User
-from app.models.common import utcnow
+from app.models import ExplorationEventTypeEnum, Trainer, TrainerEncounter, User
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -64,38 +56,18 @@ class TrainerExplorationService(
 
             trainer_service = TrainerService.from_session(session)
         self.trainer_service = trainer_service
-        self.home_cache_service = CacheService(
-            alias="TrainerHome",
-            prefix="trainer",
-            logger_params=self.logger_params,
-            schema_class=TrainerHomeSchema,
-        )
         self.encounter_cache_service = self.cache_service
-        self.party_cache_service = CacheService(
-            alias="TrainerParty",
-            prefix="trainer",
-            logger_params=self.logger_params,
-            schema_class=TrainerPartyMemberSchema,
-        )
 
     @classmethod
     def from_session(cls, session: AsyncSession):
         return cls(TrainerExplorationRepository(session))
 
-    def _home_key(self, trainer_id: str) -> str:
-        return self.home_cache_service.cache.build_key("trainer", "home", trainer_id)
-
-    def _party_key(self, trainer_id: str) -> str:
-        return self.party_cache_service.cache.build_key("trainer", "party", trainer_id)
-
     async def _invalidate_cache(self, trainer_id: str) -> None:
-        await self.home_cache_service.cache.delete_cache(self._home_key(trainer_id))
         await self.encounter_cache_service.cache.delete_cache(
             self.encounter_cache_service.build_key_list(
                 FilterPage.build(trainer_id=trainer_id)
             )
         )
-        await self.party_cache_service.cache.delete_cache(self._party_key(trainer_id))
 
     async def _get_trainer_or_404(self, current_user: User) -> Trainer:
         trainer = await self.trainer_service.get_by_user_id(current_user.id)
@@ -123,6 +95,7 @@ class TrainerExplorationService(
         if commit:
             await self.repository.session.commit()
             await self._invalidate_cache(str(trainer_id))
+            await self.trainer_service.invalidate_home_cache(str(trainer_id))
         result = []
         for entity in entities:
             fresh = await self.repository.find_by(
@@ -156,6 +129,7 @@ class TrainerExplorationService(
         entity.is_active = True
         await self.repository.session.commit()
         await self._invalidate_cache(str(trainer.id))
+        await self.trainer_service.invalidate_home_cache(str(trainer.id))
         fresh = await self.repository.find_by(
             trainer_id=trainer.id,
             id=payload.encounter_id,
@@ -166,46 +140,6 @@ class TrainerExplorationService(
                 detail="Could not load active trainer encounter",
             )
         return self.to_encounter_schema(fresh)
-
-    async def update_party(
-        self,
-        current_user: User,
-        payload: UpdateTrainerPartySchema,
-    ) -> list[TrainerPartyMemberSchema]:
-        trainer = await self._get_trainer_or_404(current_user)
-        validate_party_selection(payload.my_pokemon_ids)
-        my_pokemons = await self.repository.list_owned_my_pokemon(
-            trainer.id,
-            payload.my_pokemon_ids,
-        )
-        if len(my_pokemons) != len(payload.my_pokemon_ids):
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Trainer party contains invalid Pokemon",
-            )
-        my_pokemon_by_id = {entity.id: entity for entity in my_pokemons}
-        ordered_party: list[MyPokemon] = [
-            my_pokemon_by_id[my_pokemon_id] for my_pokemon_id in payload.my_pokemon_ids
-        ]
-        await self.repository.soft_delete_active_party(trainer.id, utcnow())
-        await self.repository.create_party(
-            trainer_id=trainer.id,
-            my_pokemons=ordered_party,
-        )
-        await self.repository.session.commit()
-        await self._invalidate_cache(str(trainer.id))
-        return await self.get_party(current_user)
-
-    async def get_party(self, current_user: User) -> list[TrainerPartyMemberSchema]:
-        trainer = await self._get_trainer_or_404(current_user)
-        key = self._party_key(str(trainer.id))
-        cached = await self.party_cache_service.get_list(key)
-        if cached:
-            return cached
-        entities = await self.repository.list_active_party(trainer.id)
-        serialized = [self.to_party_schema(entity) for entity in entities]
-        await self.party_cache_service.set_list(key, serialized)
-        return serialized
 
     async def walk(self, current_user: User) -> ExplorationEventSchema:
         trainer = await self._get_trainer_or_404(current_user)
@@ -240,37 +174,21 @@ class TrainerExplorationService(
         )
         await self.repository.session.commit()
         await self._invalidate_cache(str(trainer.id))
+        await self.trainer_service.invalidate_home_cache(str(trainer.id))
         return self.to_event_schema(entity, active_encounter=active_encounter)
 
-    async def get_home(self, current_user: User) -> TrainerHomeSchema:
-        trainer = await self._get_trainer_or_404(current_user)
-        key = self._home_key(str(trainer.id))
-        cached = await self.home_cache_service.get_one(key)
-        if cached:
-            return cached
-        active_encounter = await self.repository.find_active_trainer_encounter(trainer.id)
-        party = await self.repository.list_active_party(trainer.id)
-        latest_discoveries = await self.repository.list_latest_discoveries(trainer.id)
-        serialized = TrainerHomeSchema(
-            trainer=TrainerSchema.model_validate(trainer),
-            active_encounter=self.to_encounter_schema(active_encounter)
-            if active_encounter
-            else None,
-            party=[self.to_party_schema(entity) for entity in party],
-            latest_discoveries=[
-                PokedexSchema.model_validate(entry) for entry in latest_discoveries
-            ],
-        )
-        await self.home_cache_service.set_one(key, serialized)
-        return serialized
+    async def get_active_encounter_by_trainer_id(
+        self,
+        trainer_id: UUID,
+    ) -> TrainerEncounterSchema | None:
+        entity = await self.repository.find_active_trainer_encounter(trainer_id)
+        if entity is None:
+            return None
+        return self.to_encounter_schema(entity)
 
     @staticmethod
     def to_encounter_schema(entity) -> TrainerEncounterSchema:
         return TrainerEncounterSchema.model_validate(entity)
-
-    @staticmethod
-    def to_party_schema(entity) -> TrainerPartyMemberSchema:
-        return TrainerPartyMemberSchema.model_validate(entity)
 
     @staticmethod
     def to_event_schema(entity, active_encounter=None) -> ExplorationEventSchema:
@@ -299,7 +217,3 @@ class TrainerExplorationService(
             pokeballs_found=payload.get("pokeballs_found"),
             trainer_pokeballs=payload.get("trainer_pokeballs"),
         )
-
-    @staticmethod
-    def to_my_pokemon_schema(entity: MyPokemon) -> MyPokemonSchema:
-        return MyPokemonSchema.model_validate(entity)
