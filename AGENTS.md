@@ -218,6 +218,10 @@ Ao criar ou alterar um service:
 
 ## Trainer Boundaries
 
+- O domínio `trainer/wild_pokemon_battle_session` é responsável pela sessão de batalha selvagem iniciada a partir de `trainer_exploration.walk()`.
+- `trainer_exploration` só decide o evento e referencia a sessão; a execução de turnos, troca, fuga, logs e snapshot temporário de HP/PP pertence ao domínio de batalha.
+- Ao alterar `walk()`, preserve o bloqueio de exploração enquanto existir uma sessão de batalha ativa para o trainer.
+
 - `app/domain/trainer/trainer_party/` é o domínio canônico para party.
 - Endpoints canônicos de party:
   - `GET /trainer/party`

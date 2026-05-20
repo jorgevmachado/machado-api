@@ -159,6 +159,7 @@ class TestPokedexServiceLines:
             repository=repository,
             pokemon_service=pokemon_service,
         )
+        service._invalidate_cache = AsyncMock()
         
         trainer = MagicMock()
         trainer.id = uuid4()
@@ -183,6 +184,7 @@ class TestPokedexServiceLines:
         """Lines 59-63: discover handles entity not found"""
         repository = AsyncMock()
         service = PokedexService(repository=repository)
+        service._invalidate_cache = AsyncMock()
         
         trainer = MagicMock()
         trainer.id = uuid4()
@@ -206,6 +208,7 @@ class TestPokedexServiceLines:
             repository=repository,
             pokemon_service=pokemon_service,
         )
+        service._invalidate_cache = AsyncMock()
         
         trainer = MagicMock()
         trainer.id = uuid4()

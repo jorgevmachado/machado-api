@@ -10,6 +10,7 @@ from app.domain.trainer.pokedex.schema import PokedexPokemonSummarySchema, Poked
 from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
 from app.domain.trainer.schema import TrainerSchema
 from app.models import ExplorationEventTypeEnum
+from app.models.enums import BattleSessionStatusEnum
 
 
 class TrainerEncounterSchema(BaseModel):
@@ -53,6 +54,9 @@ class ExplorationEventSchema(BaseModel):
     encounter: PokemonEncounterSchema | None = None
     pokeballs_found: int | None = None
     trainer_pokeballs: int | None = None
+    battle_session_id: UUID | None = None
+    battle_status: BattleSessionStatusEnum | None = None
+    has_active_battle: bool = False
 
 
 class TrainerHomeSchema(BaseModel):

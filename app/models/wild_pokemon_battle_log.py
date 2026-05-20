@@ -4,28 +4,38 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, Enum as SAEnum, ForeignKey
+from sqlalchemy import JSON, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
-from app.models.enums import ExplorationEventTypeEnum
+from app.models.enums import BattleActorEnum, BattleLogTypeEnum
 
 if TYPE_CHECKING:
-    from app.models.trainer import Trainer
     from app.models.wild_pokemon_battle_session import WildPokemonBattleSession
 
 
 @table_registry.mapped_as_dataclass
-class ExplorationEvent:
-    __tablename__ = "exploration_events"
+class WildPokemonBattleLog:
+    __tablename__ = "wild_pokemon_battle_logs"
 
-    trainer_id: Mapped[UUID] = mapped_column(ForeignKey("trainers.id"), nullable=False)
-    event_type: Mapped[ExplorationEventTypeEnum] = mapped_column(
-        SAEnum(ExplorationEventTypeEnum, name="explorationeventtypeenum"),
+    battle_session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("wild_pokemon_battle_sessions.id"),
         nullable=False,
     )
-    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    log_type: Mapped[BattleLogTypeEnum] = mapped_column(
+        SAEnum(BattleLogTypeEnum, name="battlelogtypeenum"),
+        nullable=False,
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    turn_number: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    actor: Mapped[BattleActorEnum | None] = mapped_column(
+        SAEnum(BattleActorEnum, name="battleactorenum"),
+        nullable=True,
+        default=None,
+    )
+    reference: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default_factory=dict)
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True,
@@ -51,15 +61,8 @@ class ExplorationEvent:
         init=False,
     )
 
-    trainer: Mapped["Trainer"] = relationship(
+    battle_session: Mapped["WildPokemonBattleSession"] = relationship(
         lazy=default_lazy,
         init=False,
-        back_populates="exploration_events",
-    )
-    battle_sessions: Mapped[list["WildPokemonBattleSession"]] = relationship(
-        lazy=default_lazy,
-        default_factory=list,
-        init=False,
-        repr=False,
-        back_populates="exploration_event",
+        back_populates="logs",
     )

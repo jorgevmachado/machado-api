@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.pokemon import Pokemon
     from app.models.trainer import Trainer
     from app.models.trainer_party import TrainerParty
+    from app.models.wild_pokemon_battle_session import WildPokemonBattleSession
 
 
 @table_registry.mapped_as_dataclass
@@ -74,4 +75,11 @@ class MyPokemon:
         init=False,
         repr=False,
         back_populates="my_pokemon",
+    )
+    active_battle_sessions: Mapped[list["WildPokemonBattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer_active_my_pokemon",
     )

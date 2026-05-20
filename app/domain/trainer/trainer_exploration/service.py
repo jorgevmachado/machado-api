@@ -22,6 +22,12 @@ from app.domain.trainer.trainer_exploration.schema import (
     SelectTrainerEncounterSchema,
     TrainerEncounterSchema,
 )
+from app.domain.trainer.wild_pokemon_battle_session.service import (
+    WildPokemonBattleSessionService,
+)
+from app.domain.trainer.wild_pokemon_battle_session.repository import (
+    WildPokemonBattleSessionRepository,
+)
 from app.models import ExplorationEventTypeEnum, Trainer, TrainerEncounter, User
 from app.shared.schemas import FilterPage
 
@@ -38,6 +44,7 @@ class TrainerExplorationService(
         self,
         repository: TrainerExplorationRepository,
         trainer_service: TrainerService | None = None,
+        wild_pokemon_battle_session_service: WildPokemonBattleSessionService | None = None,
     ) -> None:
         super().__init__(
             alias="TrainerEncounters",
@@ -56,6 +63,12 @@ class TrainerExplorationService(
 
             trainer_service = TrainerService.from_session(session)
         self.trainer_service = trainer_service
+        self.wild_pokemon_battle_session_service = (
+            wild_pokemon_battle_session_service
+            or WildPokemonBattleSessionService(
+                WildPokemonBattleSessionRepository(session)
+            )
+        )
         self.encounter_cache_service = self.cache_service
 
     @classmethod
@@ -143,6 +156,11 @@ class TrainerExplorationService(
 
     async def walk(self, current_user: User) -> ExplorationEventSchema:
         trainer = await self._get_trainer_or_404(current_user)
+        if await self.wild_pokemon_battle_session_service.has_active_battle(trainer.id):
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail="Trainer already has an active battle",
+            )
         active_encounter = await self.repository.find_active_trainer_encounter(trainer.id)
         if active_encounter is None:
             raise HTTPException(
@@ -172,10 +190,31 @@ class TrainerExplorationService(
             event_type=event_type,
             payload=payload,
         )
+        battle_session = None
+        if event_type == ExplorationEventTypeEnum.WILD_POKEMON:
+            battle_session = (
+                await self.wild_pokemon_battle_session_service.create_or_resume_battle(
+                    trainer=trainer,
+                    exploration_event=entity,
+                    wild_pokemon=pokemon,
+                )
+            )
+            payload["battle_session_id"] = str(battle_session.id)
+            payload["battle_status"] = getattr(
+                battle_session.status,
+                "value",
+                battle_session.status,
+            )
+            payload["has_active_battle"] = True
+            entity.payload = payload
         await self.repository.session.commit()
         await self._invalidate_cache(str(trainer.id))
         await self.trainer_service.invalidate_home_cache(str(trainer.id))
-        return self.to_event_schema(entity, active_encounter=active_encounter)
+        return self.to_event_schema(
+            entity,
+            active_encounter=active_encounter,
+            battle_session=battle_session,
+        )
 
     async def get_active_encounter_by_trainer_id(
         self,
@@ -191,7 +230,11 @@ class TrainerExplorationService(
         return TrainerEncounterSchema.model_validate(entity)
 
     @staticmethod
-    def to_event_schema(entity, active_encounter=None) -> ExplorationEventSchema:
+    def to_event_schema(
+        entity,
+        active_encounter=None,
+        battle_session=None,
+    ) -> ExplorationEventSchema:
         payload = entity.payload or {}
         pokemon = None
         encounter = active_encounter.pokemon_encounter if active_encounter else None
@@ -216,4 +259,11 @@ class TrainerExplorationService(
             encounter=encounter,
             pokeballs_found=payload.get("pokeballs_found"),
             trainer_pokeballs=payload.get("trainer_pokeballs"),
+            battle_session_id=payload.get("battle_session_id"),
+            battle_status=(
+                battle_session.status
+                if battle_session is not None
+                else payload.get("battle_status")
+            ),
+            has_active_battle=payload.get("has_active_battle", False),
         )

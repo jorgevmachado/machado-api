@@ -13,6 +13,9 @@ from app.domain.trainer.schema import (
 from app.domain.trainer.trainer_exploration.schema import TrainerHomeSchema
 from app.domain.trainer.trainer_party.route import router as trainer_party_router
 from app.domain.trainer.service import TrainerService
+from app.domain.trainer.wild_pokemon_battle_session.route import (
+    router as wild_pokemon_battle_session_router,
+)
 from app.models import User
 from app.domain.trainer.pokedex.route import router as pokedex_router
 from app.domain.trainer.my_pokemon.route import router as my_pokemon_router
@@ -23,6 +26,7 @@ router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
 router.include_router(my_pokemon_router, prefix="/my-pokemon", tags=["My Pokemon"])
 router.include_router(trainer_party_router, tags=["Trainer Party"])
 router.include_router(trainer_exploration_router, prefix="/exploration", tags=["Trainer Exploration"])
+router.include_router(wild_pokemon_battle_session_router, tags=["Wild Pokemon Battle Session"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 

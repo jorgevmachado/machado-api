@@ -1,4 +1,10 @@
-from app.models.enums import ExplorationEventTypeEnum
+from app.models.enums import (
+    BattleActionTypeEnum,
+    BattleActorEnum,
+    BattleLogTypeEnum,
+    BattleSessionStatusEnum,
+    ExplorationEventTypeEnum,
+)
 from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
 from app.models.exploration_event import ExplorationEvent
 from app.models.my_pokemon import MyPokemon
@@ -24,8 +30,15 @@ from app.models.trainer import Trainer
 from app.models.trainer_encounter import TrainerEncounter
 from app.models.trainer_party import TrainerParty
 from app.models.user import User
+from app.models.wild_pokemon_battle_log import WildPokemonBattleLog
+from app.models.wild_pokemon_battle_session import WildPokemonBattleSession
+from app.models.wild_pokemon_battle_turn import WildPokemonBattleTurn
 
 __all__ = [
+    "BattleActionTypeEnum",
+    "BattleActorEnum",
+    "BattleLogTypeEnum",
+    "BattleSessionStatusEnum",
     "ExplorationEvent",
     "ExplorationEventTypeEnum",
     "GenderEnum",
@@ -55,4 +68,7 @@ __all__ = [
     "TrainerEncounter",
     "TrainerParty",
     "User",
+    "WildPokemonBattleLog",
+    "WildPokemonBattleSession",
+    "WildPokemonBattleTurn",
 ]

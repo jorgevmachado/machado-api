@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from app.models.pokemon_move import PokemonMove
     from app.models.pokemon_shape import PokemonShape
     from app.models.pokemon_type import PokemonType
+    from app.models.wild_pokemon_battle_session import WildPokemonBattleSession
 
 
 @table_registry.mapped_as_dataclass
@@ -171,4 +172,11 @@ class Pokemon:
         init=False,
         repr=False,
         back_populates="pokemon",
+    )
+    wild_battle_sessions: Mapped[list["WildPokemonBattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="wild_pokemon",
     )
