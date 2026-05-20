@@ -1,4 +1,13 @@
-from app.models.enums import ExplorationEventTypeEnum
+from app.models.battle_log import BattleLog
+from app.models.battle_session import BattleSession
+from app.models.battle_turn import BattleTurn
+from app.models.enums import (
+    BattleActionTypeEnum,
+    BattleActorEnum,
+    BattleLogTypeEnum,
+    BattleSessionStatusEnum,
+    ExplorationEventTypeEnum,
+)
 from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
 from app.models.exploration_event import ExplorationEvent
 from app.models.my_pokemon import MyPokemon
@@ -26,6 +35,13 @@ from app.models.trainer_party import TrainerParty
 from app.models.user import User
 
 __all__ = [
+    "BattleLog",
+    "BattleSession",
+    "BattleTurn",
+    "BattleActionTypeEnum",
+    "BattleActorEnum",
+    "BattleLogTypeEnum",
+    "BattleSessionStatusEnum",
     "ExplorationEvent",
     "ExplorationEventTypeEnum",
     "GenderEnum",

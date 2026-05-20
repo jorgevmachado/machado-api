@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.domain.trainer.trainer_exploration import (
+from app.domain.trainer.encounter import (
     POKEBALL_REWARD_MAX,
     POKEBALL_REWARD_MIN,
     WILD_EVENT_THRESHOLD,
@@ -32,7 +32,7 @@ def test_resolve_initial_active_encounter_uses_lowest_order():
 
 def test_choose_event_type_returns_wild_event_below_threshold(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.business.random.random",
+        "app.domain.trainer.encounter.business.random.random",
         lambda: WILD_EVENT_THRESHOLD - 0.01,
     )
 
@@ -41,7 +41,7 @@ def test_choose_event_type_returns_wild_event_below_threshold(monkeypatch):
 
 def test_choose_event_type_returns_pokeballs_event_at_or_above_threshold(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.business.random.random",
+        "app.domain.trainer.encounter.business.random.random",
         lambda: WILD_EVENT_THRESHOLD,
     )
 
@@ -58,7 +58,7 @@ def test_choose_wild_pokemon_raises_without_available_options():
 def test_choose_wild_pokemon_delegates_to_random_choice(monkeypatch):
     chosen = SimpleNamespace(id="pokemon-1")
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.business.random.choice",
+        "app.domain.trainer.encounter.business.random.choice",
         lambda options: options[0],
     )
 
@@ -67,7 +67,7 @@ def test_choose_wild_pokemon_delegates_to_random_choice(monkeypatch):
 
 def test_build_pokeball_reward_uses_configured_range(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.business.random.randint",
+        "app.domain.trainer.encounter.business.random.randint",
         lambda minimum, maximum: (
             minimum == POKEBALL_REWARD_MIN and maximum == POKEBALL_REWARD_MAX and 2
         ),

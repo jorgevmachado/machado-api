@@ -12,6 +12,8 @@ class TrainerSchema(BaseModel):
 
     id: UUID
     user_id: UUID
+    pokedex: list[PokedexSchema] = []
+    my_pokemons: list[MyPokemonSchema] = []
     pokeballs: int
     capture_rate: int
     created_at: datetime

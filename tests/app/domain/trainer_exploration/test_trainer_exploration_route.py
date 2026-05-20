@@ -4,33 +4,61 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.trainer.trainer_exploration import (
-    get_trainer_exploration_service,
+from app.domain.trainer.encounter import (
+    get_trainer_encounter_service,
     list_trainer_encounters,
     select_active_trainer_encounter,
     walk_trainer_encounter,
 )
-from app.domain.trainer.trainer_exploration import SelectTrainerEncounterSchema
-from app.domain.trainer.trainer_exploration import TrainerExplorationService
+from app.domain.trainer.encounter import SelectTrainerEncounterSchema
+from app.domain.trainer.encounter.route import get_trainer_encounter_filter
+from app.domain.trainer.encounter import TrainerEncounterService
+from app.shared.schemas import FilterPage
 
 
-def test_get_trainer_exploration_service_builds_service():
-    service = get_trainer_exploration_service(AsyncMock())
+def test_get_trainer_encounter_service_builds_service():
+    service = get_trainer_encounter_service(AsyncMock())
 
-    assert isinstance(service, TrainerExplorationService)
+    assert isinstance(service, TrainerEncounterService)
+
+
+def test_get_trainer_encounter_filter_builds_dynamic_filter():
+    result = get_trainer_encounter_filter(
+        page=2,
+        offset=12,
+        limit=6,
+        is_active=True,
+        clean_cache=True,
+    )
+
+    assert result.page == 2
+    assert result.offset == 12
+    assert result.limit == 6
+    assert result.is_active is True
+    assert result.clean_cache is True
 
 
 @pytest.mark.asyncio
 async def test_list_trainer_encounters_delegates_to_service():
     service = AsyncMock()
     expected = [SimpleNamespace(id="encounter-1")]
-    service.list_encounters.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    service.list_all_cached.return_value = expected
+    current_trainer = SimpleNamespace(id=uuid4())
+    page_filter = FilterPage.build(page=1, limit=12, clean_cache=False)
 
-    result = await list_trainer_encounters(current_user=current_user, service=service)
+    result = await list_trainer_encounters(
+        current_trainer=current_trainer,
+        service=service,
+        page_filter=page_filter,
+    )
 
     assert result is expected
-    service.list_encounters.assert_awaited_once_with(current_user)
+    service.list_all_cached.assert_awaited_once()
+    called_filter = service.list_all_cached.await_args.kwargs["page_filter"]
+    assert called_filter.trainer_id == str(current_trainer.id)
+    assert called_filter.page == page_filter.page
+    assert called_filter.limit == page_filter.limit
+    assert called_filter.clean_cache == page_filter.clean_cache
 
 
 @pytest.mark.asyncio

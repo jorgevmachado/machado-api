@@ -6,9 +6,9 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.domain.trainer.trainer_exploration import (
+from app.domain.trainer.encounter import (
     SelectTrainerEncounterSchema,
-    TrainerExplorationService,
+    TrainerEncounterService,
 )
 from app.models.enums import ExplorationEventTypeEnum, PokemonStatusEnum, RoleEnum
 
@@ -117,6 +117,26 @@ class FakeTrainerService:
         return self.trainer
 
 
+class FakeBattleSessionService:
+    def __init__(self):
+        self.active = False
+        self.created = None
+
+    async def has_active_battle(self, _trainer_id):
+        return self.active
+
+    async def create_or_resume_battle(self, *, trainer, exploration_event, wild_pokemon):
+        self.created = {
+            "trainer": trainer,
+            "exploration_event": exploration_event,
+            "wild_pokemon": wild_pokemon,
+        }
+        return SimpleNamespace(
+            id=uuid4(),
+            status="ACTIVE",
+        )
+
+
 class FakeRepository:
     def __init__(self, trainer):
         self.session = FakeSession()
@@ -155,6 +175,14 @@ class FakeRepository:
     async def find_by(self, **kwargs):
         if kwargs.get("is_active") is True:
             return await self.find_active_trainer_encounter(kwargs.get("trainer_id"))
+        if kwargs.get("pokemon_encounter_id") is not None:
+            return next(
+                (
+                    entry for entry in self.encounters
+                    if entry.pokemon_encounter.id == kwargs["pokemon_encounter_id"]
+                ),
+                None,
+            )
         return await self.find_trainer_encounter(
             kwargs.get("trainer_id"),
             kwargs.get("id"),
@@ -184,12 +212,27 @@ class FakeRepository:
             payload=payload,
         )
 
+    async def save(self, entity):
+        persisted = build_trainer_encounter(
+            self.trainer,
+            next(
+                encounter
+                for encounter in self.encounter_catalog
+                if encounter.id == entity.pokemon_encounter_id
+            ),
+            is_active=entity.is_active,
+        )
+        persisted.id = uuid4()
+        self.encounters.append(persisted)
+        return persisted
 
-def build_service(repository, trainer):
+
+def build_service(repository, trainer, battle_service=None):
     trainer_service = FakeTrainerService(trainer)
-    service = TrainerExplorationService(
+    service = TrainerEncounterService(
         repository,
         trainer_service=trainer_service,
+        battle_session_service=battle_service or FakeBattleSessionService(),
     )
     service._invalidate_cache = AsyncMock()
     service.encounter_cache_service.get_list = AsyncMock(return_value=None)
@@ -201,7 +244,7 @@ def build_service(repository, trainer):
 async def test_invalidate_cache_deletes_encounter_cache_key():
     trainer = build_trainer()
     repository = FakeRepository(trainer)
-    service = TrainerExplorationService(
+    service = TrainerEncounterService(
         repository,
         trainer_service=FakeTrainerService(trainer),
     )
@@ -215,7 +258,7 @@ async def test_invalidate_cache_deletes_encounter_cache_key():
 @pytest.mark.asyncio
 async def test_get_trainer_or_404_raises_when_trainer_is_missing():
     repository = FakeRepository(trainer=None)
-    service = TrainerExplorationService(
+    service = TrainerEncounterService(
         repository,
         trainer_service=FakeTrainerService(None),
     )
@@ -245,6 +288,24 @@ async def test_initialize_for_trainer_creates_known_encounters_and_invalidates_c
     assert repository.session.commits == 1
     service._invalidate_cache.assert_awaited_once()
     trainer_service.invalidate_home_cache.assert_awaited_once_with(str(trainer.id))
+
+
+@pytest.mark.asyncio
+async def test_add_encounters_reuses_existing_entries_and_persists_missing_ones():
+    trainer = build_trainer()
+    first = build_encounter(name="route-1", order=1)
+    second = build_encounter(name="route-2", order=2)
+    repository = FakeRepository(trainer)
+    repository.encounter_catalog = [first, second]
+    existing = build_trainer_encounter(trainer, first, is_active=True)
+    repository.encounters = [existing]
+    service, _trainer_service = build_service(repository, trainer)
+
+    result = await service.add_encounters(str(trainer.id), [first, second])
+
+    assert result[0] is existing
+    assert result[1].pokemon_encounter.id == second.id
+    assert len(repository.encounters) == 2
 
 
 @pytest.mark.asyncio
@@ -346,6 +407,20 @@ async def test_walk_raises_when_there_is_no_active_encounter():
 
 
 @pytest.mark.asyncio
+async def test_walk_raises_when_trainer_has_active_battle():
+    trainer = build_trainer()
+    repository = FakeRepository(trainer)
+    battle_service = FakeBattleSessionService()
+    battle_service.active = True
+    service, _trainer_service = build_service(repository, trainer, battle_service=battle_service)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.walk(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_walk_creates_wild_pokemon_event(monkeypatch):
     trainer = build_trainer()
     pokemon = build_pokemon("pikachu")
@@ -356,13 +431,18 @@ async def test_walk_creates_wild_pokemon_event(monkeypatch):
     )
     repository = FakeRepository(trainer)
     repository.active_encounter = active_encounter
-    service, trainer_service = build_service(repository, trainer)
+    battle_service = FakeBattleSessionService()
+    service, trainer_service = build_service(
+        repository,
+        trainer,
+        battle_service=battle_service,
+    )
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.service.choose_event_type",
+        "app.domain.trainer.encounter.service.choose_event_type",
         lambda: ExplorationEventTypeEnum.WILD_POKEMON,
     )
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.service.choose_wild_pokemon",
+        "app.domain.trainer.encounter.service.choose_wild_pokemon",
         lambda _pokemons: pokemon,
     )
 
@@ -371,7 +451,11 @@ async def test_walk_creates_wild_pokemon_event(monkeypatch):
     assert result.event_type == ExplorationEventTypeEnum.WILD_POKEMON
     assert result.pokemon.name == "pikachu"
     assert repository.created_event_payload["payload"]["pokemon_id"] == str(pokemon.id)
+    assert result.has_active_battle is True
+    assert result.battle_session_id is not None
+    assert result.battle_status == "ACTIVE"
     assert repository.session.commits == 1
+    assert battle_service.created is not None
     trainer_service.invalidate_home_cache.assert_awaited_once_with(str(trainer.id))
 
 
@@ -383,11 +467,11 @@ async def test_walk_creates_pokeball_event_and_updates_trainer_inventory(monkeyp
     repository.active_encounter = active_encounter
     service, _trainer_service = build_service(repository, trainer)
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.service.choose_event_type",
+        "app.domain.trainer.encounter.service.choose_event_type",
         lambda: ExplorationEventTypeEnum.POKEBALLS,
     )
     monkeypatch.setattr(
-        "app.domain.trainer.trainer_exploration.service.build_pokeball_reward",
+        "app.domain.trainer.encounter.service.build_pokeball_reward",
         lambda: 2,
     )
 

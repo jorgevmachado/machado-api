@@ -164,7 +164,7 @@ class FakePokedexService:
         return PokedexSchema.model_validate(entity)
 
 
-class FakeTrainerExplorationService:
+class FakeTrainerEncounterService:
     def __init__(self):
         self.created_payload = None
         self.entities = [
@@ -209,7 +209,7 @@ async def test_get_by_user_id_delegates_to_repository():
         repository,
         FakeMyPokemonService(),
         FakePokedexService(),
-        FakeTrainerExplorationService(),
+        FakeTrainerEncounterService(),
     )
 
     result = await service.get_by_user_id(uuid4())
@@ -224,7 +224,7 @@ async def test_create_delegates_to_repository():
         repository,
         FakeMyPokemonService(),
         FakePokedexService(),
-        FakeTrainerExplorationService(),
+        FakeTrainerEncounterService(),
     )
     user_id = uuid4()
 
@@ -243,12 +243,12 @@ async def test_onboard_creates_trainer_and_owned_pokemon_for_user():
     repository = FakeTrainerRepository()
     my_pokemon_service = FakeMyPokemonService()
     pokedex_service = FakePokedexService()
-    trainer_exploration_service = FakeTrainerExplorationService()
+    trainer_encounter_service = FakeTrainerEncounterService()
     service = TrainerService(
         repository,
         my_pokemon_service,
         pokedex_service,
-        trainer_exploration_service,
+        trainer_encounter_service,
     )
 
     result = await service.onboard(
@@ -265,9 +265,9 @@ async def test_onboard_creates_trainer_and_owned_pokemon_for_user():
     assert pokedex_service.created_payload["trainer_id"] is not None
     assert pokedex_service.created_payload["discovered_pokemon_name"] == "bulbasaur"
     assert pokedex_service.created_payload["commit"] is False
-    assert trainer_exploration_service.created_payload["trainer_id"] is not None
-    assert trainer_exploration_service.created_payload["starter_pokemon_name"] == "bulbasaur"
-    assert trainer_exploration_service.created_payload["commit"] is False
+    assert trainer_encounter_service.created_payload["trainer_id"] is not None
+    assert trainer_encounter_service.created_payload["starter_pokemon_name"] == "bulbasaur"
+    assert trainer_encounter_service.created_payload["commit"] is False
     assert repository.session.committed is True
     assert result.user_id is not None
     assert len(result.my_pokemons) == 1
@@ -284,7 +284,7 @@ async def test_onboard_uses_admin_values_when_role_is_admin():
         repository,
         my_pokemon_service,
         FakePokedexService(),
-        FakeTrainerExplorationService(),
+        FakeTrainerEncounterService(),
     )
 
     await service.onboard(

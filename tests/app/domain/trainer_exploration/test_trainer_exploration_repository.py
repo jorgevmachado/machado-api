@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.trainer.trainer_exploration import TrainerExplorationRepository
+from app.domain.trainer.encounter import TrainerEncounterRepository
 from app.models.enums import ExplorationEventTypeEnum
 
 
@@ -31,7 +31,7 @@ class FakeSession:
 
 
 def build_repository(session=None):
-    return TrainerExplorationRepository(session or FakeSession())
+    return TrainerEncounterRepository(session or FakeSession())
 
 
 @pytest.mark.asyncio

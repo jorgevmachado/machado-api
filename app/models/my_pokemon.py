@@ -11,6 +11,7 @@ from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
+    from app.models.battle_session import BattleSession
     from app.models.my_pokemon_move import MyPokemonMove
     from app.models.pokemon import Pokemon
     from app.models.trainer import Trainer
@@ -74,4 +75,11 @@ class MyPokemon:
         init=False,
         repr=False,
         back_populates="my_pokemon",
+    )
+    active_battle_sessions: Mapped[list["BattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer_active_my_pokemon",
     )

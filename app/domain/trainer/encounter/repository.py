@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -17,7 +16,7 @@ from app.models import (
 )
 
 
-class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
+class TrainerEncounterRepository(BaseRepository[TrainerEncounter]):
     model = TrainerEncounter
     default_order_by = "pokemon_encounter.order"
     relations = (
@@ -59,25 +58,6 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
         result = await self.session.scalars(query)
         return result.all()
 
-    async def find_by(self, **kwargs: Any) -> TrainerEncounter | None:
-        query = select(TrainerEncounter).where(TrainerEncounter.deleted_at.is_(None))
-        for option in self.relations:
-            query = query.options(option)
-
-        trainer_id = kwargs.get("trainer_id")
-        if trainer_id is not None:
-            query = query.where(TrainerEncounter.trainer_id == trainer_id)
-
-        entity_id = kwargs.get("id")
-        if entity_id is not None:
-            query = query.where(TrainerEncounter.id == entity_id)
-
-        is_active = kwargs.get("is_active")
-        if is_active is not None:
-            query = query.where(TrainerEncounter.is_active.is_(is_active))
-
-        return await self.session.scalar(query)
-
     async def list_encounters_for_pokemon(self, pokemon_name: str) -> list[PokemonEncounter]:
         query = (
             select(PokemonEncounter)
@@ -94,11 +74,11 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
         return result.all()
 
     async def create_known_encounters(
-        self,
-        *,
-        trainer_id: UUID,
-        encounters: list[PokemonEncounter],
-        active_encounter_id: UUID | None,
+            self,
+            *,
+            trainer_id: UUID,
+            encounters: list[PokemonEncounter],
+            active_encounter_id: UUID | None,
     ) -> list[TrainerEncounter]:
         entities: list[TrainerEncounter] = []
         for encounter in encounters:
@@ -113,8 +93,8 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
         return entities
 
     async def find_active_trainer_encounter(
-        self,
-        trainer_id: UUID,
+            self,
+            trainer_id: UUID,
     ) -> TrainerEncounter | None:
         return await self.find_by(
             trainer_id=trainer_id,
@@ -133,11 +113,11 @@ class TrainerExplorationRepository(BaseRepository[TrainerEncounter]):
         await self.session.flush()
 
     async def create_event(
-        self,
-        *,
-        trainer_id: UUID,
-        event_type,
-        payload: dict,
+            self,
+            *,
+            trainer_id: UUID,
+            event_type,
+            payload: dict,
     ) -> ExplorationEvent:
         entity = ExplorationEvent(
             trainer_id=trainer_id,

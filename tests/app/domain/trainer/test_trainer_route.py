@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.domain.trainer.route import (
+    get_current_trainer,
     get_trainer_service,
     onboard_trainer,
 )
@@ -15,6 +16,19 @@ def test_get_trainer_service_builds_service():
     service = get_trainer_service(AsyncMock())
 
     assert isinstance(service, TrainerService)
+
+
+@pytest.mark.asyncio
+async def test_get_current_trainer_delegates_to_service():
+    service = AsyncMock()
+    expected = SimpleNamespace(id="trainer-1")
+    service.find_by.return_value = expected
+    current_user = SimpleNamespace(id="user-id")
+
+    result = await get_current_trainer(current_user=current_user, service=service)
+
+    assert result is expected
+    service.find_by.assert_awaited_once_with(user_id="user-id")
 
 
 @pytest.mark.asyncio

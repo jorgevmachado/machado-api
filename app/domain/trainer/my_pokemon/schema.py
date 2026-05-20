@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
 
+from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
 from app.domain.pokemon.type.schema import PokemonTypeSchema
 
 
@@ -16,6 +17,7 @@ class MyPokemonBaseSummarySchema(BaseModel):
     order: int
     external_image: str
     types: list[PokemonTypeSchema] = []
+    encounters: list[PokemonEncounterSchema] = []
 
 
 class MyPokemonOwnedMoveSchema(BaseModel):

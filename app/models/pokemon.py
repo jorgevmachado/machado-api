@@ -20,6 +20,7 @@ from app.models.common import utcnow
 from app.models.enums import PokemonStatusEnum
 
 if TYPE_CHECKING:
+    from app.models.battle_session import BattleSession
     from app.models.my_pokemon import MyPokemon
     from app.models.pokedex import Pokedex
     from app.models.pokemon_ability import PokemonAbility
@@ -171,4 +172,11 @@ class Pokemon:
         init=False,
         repr=False,
         back_populates="pokemon",
+    )
+    battle_sessions: Mapped[list["BattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="wild_pokemon",
     )

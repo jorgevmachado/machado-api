@@ -11,9 +11,9 @@ async def test_get_trainer_home_delegates_to_service():
     service = AsyncMock()
     expected = SimpleNamespace(trainer=SimpleNamespace(id="trainer-1"))
     service.get_home.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="trainer-id")
 
-    result = await get_trainer_home(current_user=current_user, service=service)
+    result = await get_trainer_home(current_trainer=current_trainer, service=service)
 
     assert result is expected
-    service.get_home.assert_awaited_once_with(current_user)
+    service.get_home.assert_awaited_once_with(trainer=current_trainer)
