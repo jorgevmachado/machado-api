@@ -1,5 +1,6 @@
 from app.domain.trainer.wild_pokemon_battle_session.business import (
     apply_damage,
+    build_snapshot_move,
     build_trainer_party_snapshot,
     build_wild_pokemon_snapshot,
     calculate_damage,
@@ -7,6 +8,7 @@ from app.domain.trainer.wild_pokemon_battle_session.business import (
     choose_wild_move,
     consume_move_pp,
     ensure_switch_allowed,
+    get_party_member_or_404,
     has_remaining_healthy_party,
     resolve_battle_status,
 )
@@ -24,6 +26,7 @@ from app.domain.trainer.wild_pokemon_battle_session.route import (
 )
 from app.domain.trainer.wild_pokemon_battle_session.schema import (
     BattleLogSchema,
+    BattleMoveSchema,
     BattleSideSchema,
     BattleTurnSchema,
     SwitchBattlePokemonSchema,
@@ -36,6 +39,7 @@ from app.domain.trainer.wild_pokemon_battle_session.service import (
 
 __all__ = [
     "BattleLogSchema",
+    "BattleMoveSchema",
     "BattleSideSchema",
     "BattleTurnSchema",
     "SwitchBattlePokemonSchema",
@@ -44,6 +48,7 @@ __all__ = [
     "WildPokemonBattleSessionSchema",
     "WildPokemonBattleSessionService",
     "apply_damage",
+    "build_snapshot_move",
     "build_trainer_party_snapshot",
     "build_wild_pokemon_snapshot",
     "calculate_damage",
@@ -53,6 +58,7 @@ __all__ = [
     "ensure_switch_allowed",
     "flee_battle",
     "get_active_battle",
+    "get_party_member_or_404",
     "get_wild_pokemon_battle_session_service",
     "has_remaining_healthy_party",
     "list_battle_logs",
