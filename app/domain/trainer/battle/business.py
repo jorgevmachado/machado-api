@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from http import HTTPStatus
+from math import floor
 
 from fastapi import HTTPException
 
@@ -52,6 +53,7 @@ def build_wild_pokemon_snapshot(pokemon) -> dict:
     return {
         "pokemon_id": str(pokemon.id),
         "name": pokemon.name,
+        "capture_rate": pokemon.capture_rate or 0,
         "level": 1,
         "current_hp": pokemon.hp or 1,
         "max_hp": pokemon.hp or 1,
@@ -178,3 +180,17 @@ def has_remaining_healthy_party(party_snapshot: list[dict]) -> bool:
         if member["current_hp"] > 0:
             return True
     return False
+
+
+def calculate_capture_chance_percent(
+    *,
+    trainer_capture_rate: int,
+    wild_capture_rate: int,
+    current_hp: int,
+    max_hp: int,
+) -> int:
+    safe_max_hp = max(max_hp, 1)
+    hp_factor = 1 - (current_hp / safe_max_hp)
+    rate_advantage = max(0.0, (trainer_capture_rate - wild_capture_rate) / 255)
+    chance = 15 + (hp_factor * 55) + (rate_advantage * 25)
+    return max(15, min(95, floor(chance)))

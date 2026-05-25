@@ -26,6 +26,8 @@ class Trainer:
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     pokeballs: Mapped[int] = mapped_column(Integer, nullable=False)
     capture_rate: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_capture_rate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    capture_progress_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True, default_factory=uuid4, init=False

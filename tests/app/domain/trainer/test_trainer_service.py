@@ -1,19 +1,20 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 
 from app.domain.trainer.my_pokemon import MyPokemonSchema
+from app.domain.trainer.battle.schema import CaptureBattlePokemonSchema
 from app.domain.trainer.pokedex.schema import PokedexSchema
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
     TrainerOnboardingEncounterSchema,
 )
 from app.domain.trainer.service import TrainerService
-from app.models.enums import RoleEnum
+from app.models.enums import BattleSessionStatusEnum, RoleEnum
 
 
 class FakeSession:
@@ -32,6 +33,8 @@ class FakeSession:
                 "user_id": self.pending_entity.user_id,
                 "pokeballs": self.pending_entity.pokeballs,
                 "capture_rate": self.pending_entity.capture_rate,
+                "base_capture_rate": self.pending_entity.base_capture_rate,
+                "capture_progress_points": self.pending_entity.capture_progress_points,
             }
             self.pending_entity.id = uuid4()
             self.repository.trainer = self.pending_entity
@@ -155,6 +158,8 @@ class FakePokedexService:
                 ),
             )
         ]
+        self.is_discovered = AsyncMock(return_value=False)
+        self.discover = AsyncMock(return_value=self.entities[0])
 
     async def initialize_for_trainer(self, **kwargs):
         self.created_payload = kwargs
@@ -201,6 +206,22 @@ class FakeTrainerEncounterService:
         return TrainerOnboardingEncounterSchema.model_validate(entity)
 
 
+class FakeBattleSessionRepository:
+    def __init__(self, active_session=None, latest_session=None):
+        self.find_active_by_trainer_id = AsyncMock(return_value=active_session)
+        self.find_latest_by_trainer_id = AsyncMock(return_value=latest_session)
+
+
+class FakeBattleSessionService:
+    def __init__(self, active_session=None, latest_session=None):
+        self.repository = FakeBattleSessionRepository(active_session, latest_session)
+        self.calculate_capture_chance = Mock(return_value=64)
+        self.rolled_capture_success = Mock(return_value=True)
+        self.create_ineligible_capture_result = AsyncMock(return_value="ineligible")
+        self.process_capture_failure = AsyncMock(return_value="failed")
+        self.finalize_capture_success = AsyncMock(return_value="captured")
+
+
 @pytest.mark.asyncio
 async def test_get_by_user_id_delegates_to_repository():
     trainer = SimpleNamespace(id=uuid4())
@@ -235,6 +256,8 @@ async def test_create_delegates_to_repository():
         "user_id": user_id,
         "pokeballs": 5,
         "capture_rate": 45,
+        "base_capture_rate": 45,
+        "capture_progress_points": 0,
     }
 
 
@@ -259,6 +282,8 @@ async def test_onboard_creates_trainer_and_owned_pokemon_for_user():
     assert repository.created_payload is not None
     assert repository.created_payload["pokeballs"] == 1
     assert repository.created_payload["capture_rate"] == 75
+    assert repository.created_payload["base_capture_rate"] == 75
+    assert repository.created_payload["capture_progress_points"] == 0
     assert my_pokemon_service.created_payload["pokemon_name"] == "bulbasaur"
     assert my_pokemon_service.created_payload["nickname"] == "Leaf"
     assert my_pokemon_service.created_payload["commit"] is False
@@ -348,6 +373,217 @@ async def test_onboard_rolls_back_when_owned_pokemon_creation_fails():
 
     assert exc_info.value.status_code == 500
     assert repository.session.rolled_back is True
+
+
+@pytest.mark.asyncio
+async def test_capture_battle_pokemon_success_updates_progression_and_commits():
+    trainer = SimpleNamespace(
+        id=uuid4(),
+        pokeballs=3,
+        capture_rate=75,
+        base_capture_rate=75,
+        capture_progress_points=0,
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        wild_pokemon_name="pikachu",
+        wild_pokemon_snapshot={"capture_rate": 45, "current_hp": 5, "max_hp": 20},
+        status=BattleSessionStatusEnum.ACTIVE,
+    )
+    repository = FakeTrainerRepository(trainer=trainer)
+    my_pokemon_service = FakeMyPokemonService()
+    pokedex_service = FakePokedexService()
+    pokedex_service.is_discovered = AsyncMock(return_value=False)
+    pokedex_service.discover = AsyncMock(return_value=SimpleNamespace())
+    battle_service = FakeBattleSessionService(active_session=battle_session)
+    service = TrainerService(
+        repository,
+        my_pokemon_service,
+        pokedex_service,
+        FakeTrainerEncounterService(),
+        battle_session_service=battle_service,
+    )
+    service.home_cache_service.cache.delete_cache = AsyncMock()
+
+    result = await service.capture_battle_pokemon(
+        trainer,
+        CaptureBattlePokemonSchema(nickname="Spark"),
+    )
+
+    assert result == "captured"
+    assert trainer.pokeballs == 2
+    assert trainer.capture_progress_points == 2
+    assert trainer.capture_rate == 77
+    assert my_pokemon_service.created_payload["pokemon_name"] == "pikachu"
+    assert my_pokemon_service.created_payload["nickname"] == "Spark"
+    assert my_pokemon_service.created_payload["commit"] is False
+    assert pokedex_service.discover.await_count == 1
+    assert repository.session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_capture_battle_pokemon_rejects_ineligible_but_consumes_pokeball():
+    trainer = SimpleNamespace(
+        id=uuid4(),
+        pokeballs=2,
+        capture_rate=40,
+        base_capture_rate=40,
+        capture_progress_points=0,
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        wild_pokemon_name="pikachu",
+        wild_pokemon_snapshot={"capture_rate": 45, "current_hp": 5, "max_hp": 20},
+        status=BattleSessionStatusEnum.ACTIVE,
+    )
+    repository = FakeTrainerRepository(trainer=trainer)
+    battle_service = FakeBattleSessionService(active_session=battle_session)
+    service = TrainerService(
+        repository,
+        FakeMyPokemonService(),
+        FakePokedexService(),
+        FakeTrainerEncounterService(),
+        battle_session_service=battle_service,
+    )
+    service.home_cache_service.cache.delete_cache = AsyncMock()
+
+    result = await service.capture_battle_pokemon(trainer, CaptureBattlePokemonSchema())
+
+    assert result == "ineligible"
+    assert trainer.pokeballs == 1
+    assert trainer.capture_progress_points == 0
+    battle_service.process_capture_failure.assert_not_called()
+    battle_service.finalize_capture_success.assert_not_called()
+    assert repository.session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_capture_battle_pokemon_failed_chance_does_not_progress_trainer():
+    trainer = SimpleNamespace(
+        id=uuid4(),
+        pokeballs=2,
+        capture_rate=75,
+        base_capture_rate=75,
+        capture_progress_points=0,
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        wild_pokemon_name="pikachu",
+        wild_pokemon_snapshot={"capture_rate": 45, "current_hp": 10, "max_hp": 20},
+        status=BattleSessionStatusEnum.ACTIVE,
+    )
+    repository = FakeTrainerRepository(trainer=trainer)
+    battle_service = FakeBattleSessionService(active_session=battle_session)
+    battle_service.rolled_capture_success = Mock(return_value=False)
+    service = TrainerService(
+        repository,
+        FakeMyPokemonService(),
+        FakePokedexService(),
+        FakeTrainerEncounterService(),
+        battle_session_service=battle_service,
+    )
+    service.home_cache_service.cache.delete_cache = AsyncMock()
+
+    result = await service.capture_battle_pokemon(trainer, CaptureBattlePokemonSchema())
+
+    assert result == "failed"
+    assert trainer.pokeballs == 1
+    assert trainer.capture_progress_points == 0
+    assert trainer.capture_rate == 75
+    battle_service.process_capture_failure.assert_awaited_once()
+    assert repository.session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_capture_battle_pokemon_rejects_without_pokeballs():
+    trainer = SimpleNamespace(
+        id=uuid4(),
+        pokeballs=0,
+        capture_rate=75,
+        base_capture_rate=75,
+        capture_progress_points=0,
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        wild_pokemon_name="pikachu",
+        wild_pokemon_snapshot={"capture_rate": 45, "current_hp": 10, "max_hp": 20},
+        status=BattleSessionStatusEnum.ACTIVE,
+    )
+    repository = FakeTrainerRepository(trainer=trainer)
+    service = TrainerService(
+        repository,
+        FakeMyPokemonService(),
+        FakePokedexService(),
+        FakeTrainerEncounterService(),
+        battle_session_service=FakeBattleSessionService(active_session=battle_session),
+    )
+    service.home_cache_service.cache.delete_cache = AsyncMock()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.capture_battle_pokemon(trainer, CaptureBattlePokemonSchema())
+
+    assert exc_info.value.status_code == 400
+    assert repository.session.rolled_back is True
+
+
+@pytest.mark.asyncio
+async def test_capture_battle_pokemon_rejects_when_latest_battle_was_already_captured():
+    trainer = SimpleNamespace(
+        id=uuid4(),
+        pokeballs=2,
+        capture_rate=75,
+        base_capture_rate=75,
+        capture_progress_points=0,
+    )
+    repository = FakeTrainerRepository(trainer=trainer)
+    latest_battle = SimpleNamespace(status=BattleSessionStatusEnum.CAPTURED)
+    service = TrainerService(
+        repository,
+        FakeMyPokemonService(),
+        FakePokedexService(),
+        FakeTrainerEncounterService(),
+        battle_session_service=FakeBattleSessionService(active_session=None, latest_session=latest_battle),
+    )
+    service.home_cache_service.cache.delete_cache = AsyncMock()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.capture_battle_pokemon(trainer, CaptureBattlePokemonSchema())
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_capture_battle_pokemon_rejects_when_trainer_has_no_active_battle():
+    trainer = SimpleNamespace(
+        id=uuid4(),
+        pokeballs=2,
+        capture_rate=75,
+        base_capture_rate=75,
+        capture_progress_points=0,
+    )
+    repository = FakeTrainerRepository(trainer=trainer)
+    service = TrainerService(
+        repository,
+        FakeMyPokemonService(),
+        FakePokedexService(),
+        FakeTrainerEncounterService(),
+        battle_session_service=FakeBattleSessionService(active_session=None, latest_session=None),
+    )
+    service.home_cache_service.cache.delete_cache = AsyncMock()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.capture_battle_pokemon(trainer, CaptureBattlePokemonSchema())
+
+    assert exc_info.value.status_code == 404
+
+
+def test_calculate_effective_capture_rate_uses_hybrid_progression():
+    result = TrainerService.calculate_effective_capture_rate(
+        base_capture_rate=75,
+        capture_progress_points=40,
+    )
+
+    assert result == 94
 
 
 @pytest.mark.asyncio

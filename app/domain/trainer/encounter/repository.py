@@ -40,24 +40,6 @@ class TrainerEncounterRepository(BaseRepository[TrainerEncounter]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
-    async def list_all(self, page_filter=None) -> list[TrainerEncounter]:
-        trainer_id = getattr(page_filter, "trainer_id", None) if page_filter else None
-        query = (
-            select(TrainerEncounter)
-            .join(TrainerEncounter.pokemon_encounter)
-            .where(
-                TrainerEncounter.deleted_at.is_(None),
-                PokemonEncounter.deleted_at.is_(None),
-            )
-        )
-        if trainer_id is not None:
-            query = query.where(TrainerEncounter.trainer_id == trainer_id)
-        for option in self.relations:
-            query = query.options(option)
-        query = self._apply_order_by(query, page_filter)
-        result = await self.session.scalars(query)
-        return result.all()
-
     async def list_encounters_for_pokemon(self, pokemon_name: str) -> list[PokemonEncounter]:
         query = (
             select(PokemonEncounter)

@@ -57,6 +57,8 @@ def build_trainer():
         user_id=uuid4(),
         pokeballs=3,
         capture_rate=75,
+        base_capture_rate=75,
+        capture_progress_points=0,
         my_pokemons=[],
         created_at=datetime.now(timezone.utc),
         updated_at=None,

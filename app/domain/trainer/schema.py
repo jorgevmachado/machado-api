@@ -16,6 +16,8 @@ class TrainerSchema(BaseModel):
     my_pokemons: list[MyPokemonSchema] = []
     pokeballs: int
     capture_rate: int
+    base_capture_rate: int
+    capture_progress_points: int
     created_at: datetime
     updated_at: datetime | None = None
     deleted_at: datetime | None = None

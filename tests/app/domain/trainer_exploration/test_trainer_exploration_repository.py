@@ -5,6 +5,7 @@ import pytest
 
 from app.domain.trainer.encounter import TrainerEncounterRepository
 from app.models.enums import ExplorationEventTypeEnum
+from app.shared.schemas import FilterPage
 
 
 class FakeSession:
@@ -71,7 +72,7 @@ async def test_list_all_returns_loaded_entities():
     session.scalars_result = [SimpleNamespace(id=uuid4())]
     repository = build_repository(session)
 
-    result = await repository.list_all(SimpleNamespace(trainer_id=uuid4()))
+    result = await repository.list_all(FilterPage.build(trainer_id=uuid4()))
 
     assert len(result) == 1
 

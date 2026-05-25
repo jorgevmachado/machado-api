@@ -201,6 +201,8 @@ class TestAuthService:
             user_id=user_id,
             pokeballs=1,
             capture_rate=75,
+            base_capture_rate=75,
+            capture_progress_points=0,
             created_at=datetime.now(timezone.utc),
         )
         service = AuthService(repository=AsyncMock(), trainer_service=trainer_service)

@@ -171,12 +171,11 @@ class TestPokedexServiceLines:
         # Mock find_by to return pokedex twice (line 55, line 71)
         repository.find_by.side_effect = [pokedex, pokedex]
         pokemon_service.find_detail.return_value = MagicMock()
-        repository.update = AsyncMock()
         
         result = await service.discover(trainer=trainer, pokemon_name="bulbasaur")
         
-        # Verify update was called (line 69)
-        repository.update.assert_awaited_once()
+        repository.session.flush.assert_awaited_once()
+        repository.session.commit.assert_awaited_once()
         assert result == pokedex
 
     @pytest.mark.asyncio

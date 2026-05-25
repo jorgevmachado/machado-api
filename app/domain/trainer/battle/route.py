@@ -7,14 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.core.security.security import get_current_trainer
 from app.domain.trainer.battle.schema import (
+    BattleCaptureResultSchema,
     BattleSessionSchema,
     BattleLogSchema,
+    CaptureBattlePokemonSchema,
     SwitchBattlePokemonSchema,
     UseBattleMoveSchema,
 )
 from app.domain.trainer.battle.service import (
     BattleSessionService,
 )
+from app.domain.trainer.service import TrainerService
 from app.models import Trainer
 
 router = APIRouter(prefix="/battle", tags=["Battle Session"])
@@ -26,6 +29,12 @@ def get_battle_session_service(
     session: Session,
 ) -> BattleSessionService:
     return BattleSessionService.from_session(session)
+
+
+def get_trainer_service(
+    session: Session,
+) -> TrainerService:
+    return TrainerService.from_session(session)
 
 
 @router.get(
@@ -88,6 +97,22 @@ async def flee_battle(
     ],
 ):
     return await service.flee(current_trainer)
+
+
+@router.post(
+    "/capture",
+    response_model=BattleCaptureResultSchema,
+    status_code=HTTPStatus.OK,
+)
+async def capture_battle_pokemon(
+    payload: CaptureBattlePokemonSchema,
+    current_trainer: Annotated[Trainer, Depends(get_current_trainer)],
+    service: Annotated[
+        TrainerService,
+        Depends(get_trainer_service),
+    ],
+):
+    return await service.capture_battle_pokemon(current_trainer, payload)
 
 
 @router.get(

@@ -238,3 +238,22 @@ async def test_list_latest_discoveries_delegates_to_repository():
         trainer_id=trainer_id,
         limit=5,
     )
+
+
+@pytest.mark.asyncio
+async def test_is_discovered_returns_true_only_for_discovered_entries():
+    repository = FakeRepository()
+    service = PokedexService(repository, FakeTrainerService())
+    trainer_id = uuid4()
+
+    repository.entity.discovered = True
+    result = await service.is_discovered(trainer_id=trainer_id, pokemon_name='bulbasaur')
+    assert result is True
+
+    repository.entity.discovered = False
+    result = await service.is_discovered(trainer_id=trainer_id, pokemon_name='bulbasaur')
+    assert result is False
+
+    repository.find_by = AsyncMock(return_value=None)
+    result = await service.is_discovered(trainer_id=trainer_id, pokemon_name='bulbasaur')
+    assert result is False

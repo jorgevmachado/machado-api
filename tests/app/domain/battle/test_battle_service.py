@@ -14,7 +14,11 @@ from app.domain.trainer.battle.schema import (
 from app.domain.trainer.battle.service import (
     BattleSessionService,
 )
-from app.models.enums import BattleSessionStatusEnum
+from app.models.enums import (
+    BattleCaptureOutcomeEnum,
+    BattleLogTypeEnum,
+    BattleSessionStatusEnum,
+)
 
 
 class FakeSession:
@@ -44,6 +48,8 @@ def build_trainer():
         user_id=uuid4(),
         pokeballs=5,
         capture_rate=80,
+        base_capture_rate=75,
+        capture_progress_points=0,
     )
 
 
@@ -83,6 +89,7 @@ def build_wild_pokemon(name="pikachu", hp=15, move_power=5):
     return SimpleNamespace(
         id=uuid4(),
         name=name,
+        capture_rate=45,
         hp=hp,
         attack=11,
         defense=8,
@@ -328,6 +335,17 @@ async def test_get_active_battle_summary_returns_normalized_summary():
     assert result.has_active_battle is True
 
 
+def test_calculate_capture_chance_uses_hp_and_rate_advantage():
+    result = BattleSessionService.calculate_capture_chance(
+        trainer_capture_rate=75,
+        wild_capture_rate=45,
+        current_hp=5,
+        max_hp=20,
+    )
+
+    assert result == 59
+
+
 @pytest.mark.asyncio
 async def test_list_logs_falls_back_to_latest_terminal_session():
     trainer = build_trainer()
@@ -541,3 +559,115 @@ async def test_get_active_entity_and_to_turn_schema_cover_helpers():
         await service._get_active_entity(trainer.id)
 
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_public_get_active_entity_delegates_to_private_helper():
+    trainer = build_trainer()
+    party = [build_party_member(trainer)]
+    wild_pokemon = build_wild_pokemon()
+    service, _repository = build_service(party=party, wild_pokemon=wild_pokemon)
+    session = await service.create_or_resume_battle(
+        trainer=trainer,
+        exploration_event=SimpleNamespace(id=uuid4()),
+        wild_pokemon=wild_pokemon,
+    )
+
+    result = await service.get_active_entity(trainer.id)
+
+    assert result is session
+
+
+@pytest.mark.asyncio
+async def test_create_ineligible_capture_result_logs_and_returns_schema():
+    trainer = build_trainer()
+    party = [build_party_member(trainer)]
+    wild_pokemon = build_wild_pokemon()
+    service, repository = build_service(party=party, wild_pokemon=wild_pokemon)
+    session = await service.create_or_resume_battle(
+        trainer=trainer,
+        exploration_event=SimpleNamespace(id=uuid4()),
+        wild_pokemon=wild_pokemon,
+    )
+
+    result = await service.create_ineligible_capture_result(
+        entity=session,
+        trainer=trainer,
+        capture_chance=42,
+    )
+
+    assert result.success is False
+    assert result.outcome == BattleCaptureOutcomeEnum.INELIGIBLE_CAPTURE_RATE
+    assert result.capture_chance == 42
+    assert repository.logs[-1].log_type == BattleLogTypeEnum.CAPTURE_FAILED
+    assert repository.logs[-1].payload["reason"] == BattleCaptureOutcomeEnum.INELIGIBLE_CAPTURE_RATE.value
+
+
+@pytest.mark.asyncio
+async def test_process_capture_failure_records_logs_and_keeps_battle_active():
+    trainer = build_trainer()
+    party = [build_party_member(trainer)]
+    wild_pokemon = build_wild_pokemon()
+    service, repository = build_service(party=party, wild_pokemon=wild_pokemon)
+    session = await service.create_or_resume_battle(
+        trainer=trainer,
+        exploration_event=SimpleNamespace(id=uuid4()),
+        wild_pokemon=wild_pokemon,
+    )
+    service._process_wild_response = AsyncMock()
+
+    result = await service.process_capture_failure(
+        entity=session,
+        trainer=trainer,
+        capture_chance=37,
+    )
+
+    assert result.success is False
+    assert result.outcome == BattleCaptureOutcomeEnum.FAILED_CHANCE
+    assert result.capture_chance == 37
+    assert session.turn_number == 1
+    assert len(repository.turns) == 1
+    assert repository.logs[-1].log_type == BattleLogTypeEnum.CAPTURE_FAILED
+    service._process_wild_response.assert_awaited_once_with(session)
+
+
+@pytest.mark.asyncio
+async def test_finalize_capture_success_marks_session_captured_and_returns_payload():
+    trainer = build_trainer()
+    trainer.capture_progress_points = 2
+    party = [build_party_member(trainer)]
+    wild_pokemon = build_wild_pokemon()
+    service, repository = build_service(party=party, wild_pokemon=wild_pokemon)
+    session = await service.create_or_resume_battle(
+        trainer=trainer,
+        exploration_event=SimpleNamespace(id=uuid4()),
+        wild_pokemon=wild_pokemon,
+    )
+    my_pokemon = build_party_member(trainer, name="pikachu", slot=2).my_pokemon
+    my_pokemon.pokemon.order = 25
+    my_pokemon.pokemon.external_image = "https://example.com/pikachu.png"
+
+    result = await service.finalize_capture_success(
+        entity=session,
+        trainer=trainer,
+        my_pokemon=my_pokemon,
+        progress_points_awarded=2,
+        capture_chance=88,
+    )
+
+    assert result.success is True
+    assert result.outcome == BattleCaptureOutcomeEnum.CAPTURED
+    assert result.my_pokemon is not None
+    assert result.my_pokemon.id == my_pokemon.id
+    assert result.my_pokemon.name == my_pokemon.name
+    assert result.progress_points_awarded == 2
+    assert result.capture_chance == 88
+    assert session.status == BattleSessionStatusEnum.CAPTURED
+    assert BattleLogTypeEnum.CAPTURE_SUCCESS in [log.log_type for log in repository.logs]
+
+
+def test_rolled_capture_success_uses_random_threshold():
+    with patch('app.domain.trainer.battle.service.random.randint', return_value=25):
+        assert BattleSessionService.rolled_capture_success(25) is True
+    with patch('app.domain.trainer.battle.service.random.randint', return_value=26):
+        assert BattleSessionService.rolled_capture_success(25) is False

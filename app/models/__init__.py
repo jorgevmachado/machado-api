@@ -4,6 +4,7 @@ from app.models.battle_turn import BattleTurn
 from app.models.enums import (
     BattleActionTypeEnum,
     BattleActorEnum,
+    BattleCaptureOutcomeEnum,
     BattleLogTypeEnum,
     BattleSessionStatusEnum,
     ExplorationEventTypeEnum,
@@ -40,6 +41,7 @@ __all__ = [
     "BattleTurn",
     "BattleActionTypeEnum",
     "BattleActorEnum",
+    "BattleCaptureOutcomeEnum",
     "BattleLogTypeEnum",
     "BattleSessionStatusEnum",
     "ExplorationEvent",

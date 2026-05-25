@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from http import HTTPStatus
 from uuid import UUID
 
@@ -16,6 +17,7 @@ from app.domain.trainer.battle.business import (
     apply_damage,
     build_trainer_party_snapshot,
     build_wild_pokemon_snapshot,
+    calculate_capture_chance_percent,
     calculate_damage,
     choose_initial_trainer_pokemon,
     choose_wild_move,
@@ -27,6 +29,7 @@ from app.domain.trainer.battle.business import (
 from app.domain.trainer.battle.repository import BattleSessionRepository
 from app.domain.trainer.battle.schema import (
     ActiveBattleSummarySchema,
+    BattleCaptureResultSchema,
     BattleSessionSchema,
     BattleLogSchema,
     BattleSideSchema,
@@ -43,6 +46,7 @@ from app.models import (
     BattleTurn,
     BattleActionTypeEnum,
     BattleActorEnum,
+    BattleCaptureOutcomeEnum,
     BattleLogTypeEnum,
     BattleSessionStatusEnum,
     Trainer,
@@ -118,6 +122,7 @@ class BattleSessionService(
                 wild_pokemon_snapshot=wild_snapshot,
             )
         )
+        setattr(entity, "_trainer_context", trainer)
         await self.repository.create_log(
             BattleLog(
                 battle_session_id=entity.id,
@@ -183,6 +188,157 @@ class BattleSessionService(
             )
         logs = await self.repository.list_logs(entity.id)
         return [BattleLogSchema.model_validate(log) for log in logs]
+
+    async def get_active_entity(
+        self,
+        trainer_id: UUID,
+    ) -> BattleSession:
+        return await self._get_active_entity(trainer_id)
+
+    async def create_ineligible_capture_result(
+        self,
+        *,
+        entity: BattleSession,
+        trainer: Trainer,
+        capture_chance: int | None = None,
+    ) -> BattleCaptureResultSchema:
+        await self.repository.create_log(
+            BattleLog(
+                battle_session_id=entity.id,
+                turn_number=entity.turn_number,
+                actor=BattleActorEnum.TRAINER,
+                log_type=BattleLogTypeEnum.CAPTURE_FAILED,
+                message="Capture attempt failed due to insufficient trainer capture rate",
+                payload={
+                    "reason": BattleCaptureOutcomeEnum.INELIGIBLE_CAPTURE_RATE.value,
+                    "trainer_capture_rate": trainer.capture_rate,
+                    "wild_capture_rate": entity.wild_pokemon_snapshot.get("capture_rate", 0),
+                    "capture_chance": capture_chance,
+                },
+            )
+        )
+        return BattleCaptureResultSchema(
+            success=False,
+            outcome=BattleCaptureOutcomeEnum.INELIGIBLE_CAPTURE_RATE,
+            message="Trainer capture rate is too low for this Pokemon",
+            battle_session=self.to_schema(entity),
+            trainer_pokeballs=trainer.pokeballs,
+            trainer_capture_rate=trainer.capture_rate,
+            trainer_capture_progress_points=trainer.capture_progress_points,
+            progress_points_awarded=0,
+            capture_chance=capture_chance,
+        )
+
+    async def process_capture_failure(
+        self,
+        *,
+        entity: BattleSession,
+        trainer: Trainer,
+        capture_chance: int,
+    ) -> BattleCaptureResultSchema:
+        entity.turn_number += 1
+        await self._record_turn_and_logs(
+            entity=entity,
+            actor=BattleActorEnum.TRAINER,
+            action_type=BattleActionTypeEnum.CAPTURE,
+            move_name=None,
+            message="Trainer used a Pokeball",
+            payload={"capture_chance": capture_chance},
+            log_type=BattleLogTypeEnum.CAPTURE_ATTEMPT,
+        )
+        await self.repository.create_log(
+            BattleLog(
+                battle_session_id=entity.id,
+                turn_number=entity.turn_number,
+                actor=BattleActorEnum.TRAINER,
+                log_type=BattleLogTypeEnum.CAPTURE_FAILED,
+                message="The wild Pokemon broke free",
+                payload={
+                    "reason": BattleCaptureOutcomeEnum.FAILED_CHANCE.value,
+                    "capture_chance": capture_chance,
+                },
+            )
+        )
+        await self._process_wild_response(entity)
+        return BattleCaptureResultSchema(
+            success=False,
+            outcome=BattleCaptureOutcomeEnum.FAILED_CHANCE,
+            message="The wild Pokemon broke free",
+            battle_session=self.to_schema(entity),
+            trainer_pokeballs=trainer.pokeballs,
+            trainer_capture_rate=trainer.capture_rate,
+            trainer_capture_progress_points=trainer.capture_progress_points,
+            progress_points_awarded=0,
+            capture_chance=capture_chance,
+        )
+
+    async def finalize_capture_success(
+        self,
+        *,
+        entity: BattleSession,
+        trainer: Trainer,
+        my_pokemon,
+        progress_points_awarded: int,
+        capture_chance: int,
+    ) -> BattleCaptureResultSchema:
+        entity.turn_number += 1
+        entity.status = BattleSessionStatusEnum.CAPTURED
+        await self._record_turn_and_logs(
+            entity=entity,
+            actor=BattleActorEnum.TRAINER,
+            action_type=BattleActionTypeEnum.CAPTURE,
+            move_name=None,
+            message="Trainer used a Pokeball",
+            payload={"capture_chance": capture_chance},
+            log_type=BattleLogTypeEnum.CAPTURE_ATTEMPT,
+        )
+        await self.repository.create_log(
+            BattleLog(
+                battle_session_id=entity.id,
+                turn_number=entity.turn_number,
+                actor=BattleActorEnum.TRAINER,
+                log_type=BattleLogTypeEnum.CAPTURE_SUCCESS,
+                message=f"Trainer captured {entity.wild_pokemon_name}",
+                payload={
+                    "my_pokemon_id": str(my_pokemon.id),
+                    "progress_points_awarded": progress_points_awarded,
+                    "capture_chance": capture_chance,
+                },
+            )
+        )
+        await self._finalize_battle_if_needed(entity)
+        return BattleCaptureResultSchema(
+            success=True,
+            outcome=BattleCaptureOutcomeEnum.CAPTURED,
+            message=f"Trainer captured {entity.wild_pokemon_name}",
+            battle_session=self.to_schema(entity),
+            my_pokemon=my_pokemon,
+            pokedex_updated=True,
+            trainer_pokeballs=trainer.pokeballs,
+            trainer_capture_rate=trainer.capture_rate,
+            trainer_capture_progress_points=trainer.capture_progress_points,
+            progress_points_awarded=progress_points_awarded,
+            capture_chance=capture_chance,
+        )
+
+    @staticmethod
+    def calculate_capture_chance(
+        *,
+        trainer_capture_rate: int,
+        wild_capture_rate: int,
+        current_hp: int,
+        max_hp: int,
+    ) -> int:
+        return calculate_capture_chance_percent(
+            trainer_capture_rate=trainer_capture_rate,
+            wild_capture_rate=wild_capture_rate,
+            current_hp=current_hp,
+            max_hp=max_hp,
+        )
+
+    @staticmethod
+    def rolled_capture_success(chance_percent: int) -> bool:
+        return random.randint(1, 100) <= chance_percent
 
     async def use_move(
         self,
@@ -398,6 +554,7 @@ class BattleSessionService(
             BattleSessionStatusEnum.WILD_POKEMON_DEFEATED: "Trainer defeated the wild Pokemon",
             BattleSessionStatusEnum.TRAINER_DEFEATED: "Trainer was defeated in battle",
             BattleSessionStatusEnum.ESCAPED: "Trainer fled from battle",
+            BattleSessionStatusEnum.CAPTURED: "Trainer captured the wild Pokemon",
         }
         await self.repository.create_log(
             BattleLog(
@@ -433,6 +590,7 @@ class BattleSessionService(
 
     def to_schema(self, entity: BattleSession) -> BattleSessionSchema:
         trainer_member = self._get_active_trainer_member(entity)
+        trainer_context = getattr(entity, "trainer", None) or getattr(entity, "_trainer_context", None)
         party = [self._build_side_schema(member) for member in entity.trainer_party_snapshot]
         return BattleSessionSchema(
             id=entity.id,
@@ -444,6 +602,8 @@ class BattleSessionService(
             wild_pokemon_level=entity.wild_pokemon_level,
             turn_number=entity.turn_number,
             status=entity.status,
+            trainer_pokeballs=trainer_context.pokeballs if trainer_context else 0,
+            trainer_capture_rate=trainer_context.capture_rate if trainer_context else 0,
             trainer_side=self._build_side_schema(trainer_member),
             wild_side=self._build_side_schema(entity.wild_pokemon_snapshot),
             party=party,

@@ -51,7 +51,24 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
         self.pokemon_service = pokemon_service
         self.list_cache_service = self.cache_service
 
-    async def discover(self, trainer: Trainer, pokemon_name: str) -> Pokedex:
+    async def is_discovered(
+            self,
+            *,
+            trainer_id: UUID,
+            pokemon_name: str,
+    ) -> bool:
+        entity = await self.repository.find_by(
+            trainer_id=trainer_id,
+            name=pokemon_name,
+        )
+        return bool(entity and entity.discovered)
+
+    async def discover(
+            self,
+            trainer: Trainer,
+            pokemon_name: str,
+            commit: bool = True,
+    ) -> Pokedex:
         entity = await self.repository.find_by(
             trainer_id=trainer.id,
             name=pokemon_name,
@@ -66,7 +83,7 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
             await self.pokemon_service.find_detail(identifier=pokemon_name.lower())
             entity.discovered = True
             entity.discovered_at = utcnow()
-            await self.repository.update(entity)
+            await self.repository.session.flush()
 
         fresh = await self.repository.find_by(
             trainer_id=trainer.id,
@@ -77,10 +94,12 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
                 detail="Could not load discovered Pokedex entry",
             )
-        await self._invalidate_cache(
-            trainer_id=str(trainer.id),
-            identifier=str(entity.id)
-        )
+        if commit:
+            await self.repository.session.commit()
+            await self._invalidate_cache(
+                trainer_id=str(trainer.id),
+                identifier=str(entity.id)
+            )
         return fresh
 
     async def initialize_for_trainer(

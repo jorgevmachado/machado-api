@@ -31,6 +31,7 @@ class ExplorationEventTypeEnum(str, Enum):
 class BattleSessionStatusEnum(str, Enum):
     ACTIVE = "ACTIVE"
     ESCAPED = "ESCAPED"
+    CAPTURED = "CAPTURED"
     WILD_POKEMON_DEFEATED = "WILD_POKEMON_DEFEATED"
     TRAINER_DEFEATED = "TRAINER_DEFEATED"
 
@@ -44,6 +45,7 @@ class BattleActionTypeEnum(str, Enum):
     USE_MOVE = "USE_MOVE"
     SWITCH = "SWITCH"
     FLEE = "FLEE"
+    CAPTURE = "CAPTURE"
     AUTO_RESPONSE = "AUTO_RESPONSE"
 
 
@@ -53,4 +55,13 @@ class BattleLogTypeEnum(str, Enum):
     DAMAGE_DEALT = "DAMAGE_DEALT"
     SWITCHED = "SWITCHED"
     ESCAPED = "ESCAPED"
+    CAPTURE_ATTEMPT = "CAPTURE_ATTEMPT"
+    CAPTURE_SUCCESS = "CAPTURE_SUCCESS"
+    CAPTURE_FAILED = "CAPTURE_FAILED"
     SESSION_FINISHED = "SESSION_FINISHED"
+
+
+class BattleCaptureOutcomeEnum(str, Enum):
+    CAPTURED = "CAPTURED"
+    FAILED_CHANCE = "FAILED_CHANCE"
+    INELIGIBLE_CAPTURE_RATE = "INELIGIBLE_CAPTURE_RATE"

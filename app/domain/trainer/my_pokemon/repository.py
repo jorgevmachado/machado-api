@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.repository.base import BaseRepository
@@ -23,9 +22,9 @@ class MyPokemonRepository(BaseRepository[MyPokemon]):
         selectinload(MyPokemon.moves).selectinload(MyPokemonMove.pokemon_move),
     )
 
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-
-    async def find_base_pokemon(self, name: str) -> Pokemon | None:
-        query = select(Pokemon).where(Pokemon.name == name)
+    async def find_base_pokemon(self, pokemon_name: str) -> Pokemon | None:
+        query = select(Pokemon).where(
+            Pokemon.name == pokemon_name,
+            Pokemon.deleted_at.is_(None),
+        )
         return await self.session.scalar(query)

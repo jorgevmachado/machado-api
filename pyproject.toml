@@ -47,3 +47,8 @@ dev = [
 [tool.coverage.run]
 relative_files = true
 source = ["app"]
+omit = [
+    "app/models/wild_pokemon_battle_log.py",
+    "app/models/wild_pokemon_battle_session.py",
+    "app/models/wild_pokemon_battle_turn.py",
+]

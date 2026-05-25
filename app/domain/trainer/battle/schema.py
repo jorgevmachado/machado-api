@@ -5,9 +5,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
 from app.models.enums import (
     BattleActionTypeEnum,
     BattleActorEnum,
+    BattleCaptureOutcomeEnum,
     BattleLogTypeEnum,
     BattleSessionStatusEnum,
 )
@@ -52,6 +54,8 @@ class BattleSessionSchema(BaseModel):
     wild_pokemon_level: int
     turn_number: int
     status: BattleSessionStatusEnum
+    trainer_pokeballs: int
+    trainer_capture_rate: int
     trainer_side: BattleSideSchema
     wild_side: BattleSideSchema
     party: list[BattleSideSchema] = []
@@ -99,3 +103,21 @@ class UseBattleMoveSchema(BaseModel):
 
 class SwitchBattlePokemonSchema(BaseModel):
     my_pokemon_id: UUID
+
+
+class CaptureBattlePokemonSchema(BaseModel):
+    nickname: str | None = None
+
+
+class BattleCaptureResultSchema(BaseModel):
+    success: bool
+    outcome: BattleCaptureOutcomeEnum
+    message: str
+    battle_session: BattleSessionSchema
+    my_pokemon: MyPokemonSchema | None = None
+    pokedex_updated: bool = False
+    trainer_pokeballs: int
+    trainer_capture_rate: int
+    trainer_capture_progress_points: int
+    progress_points_awarded: int = 0
+    capture_chance: int | None = None

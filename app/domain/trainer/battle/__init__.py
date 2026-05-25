@@ -13,15 +13,6 @@ from app.domain.trainer.battle.business import (
 from app.domain.trainer.battle.repository import (
     BattleSessionRepository,
 )
-from app.domain.trainer.battle.route import (
-    flee_battle,
-    get_active_battle,
-    get_battle_session_service,
-    list_battle_logs,
-    router,
-    switch_battle_pokemon,
-    use_battle_move,
-)
 from app.domain.trainer.battle.schema import (
     ActiveBattleSummarySchema,
     BattleSessionSchema,
@@ -53,13 +44,6 @@ __all__ = [
     "choose_wild_move",
     "consume_move_pp",
     "ensure_switch_allowed",
-    "flee_battle",
-    "get_active_battle",
-    "get_battle_session_service",
     "has_remaining_healthy_party",
-    "list_battle_logs",
     "resolve_battle_status",
-    "router",
-    "switch_battle_pokemon",
-    "use_battle_move",
 ]

@@ -44,6 +44,7 @@ def test_build_snapshot_move_and_wild_snapshot_cover_serializers():
         SimpleNamespace(
             id=uuid4(),
             name='pikachu',
+            capture_rate=120,
             hp=12,
             attack=11,
             defense=8,

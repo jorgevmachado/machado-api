@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from math import floor, sqrt
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -19,6 +20,10 @@ from app.domain.trainer.my_pokemon.business import (
 )
 from app.domain.trainer.my_pokemon.repository import MyPokemonRepository
 from app.domain.trainer.battle.repository import BattleSessionRepository
+from app.domain.trainer.battle.schema import (
+    BattleCaptureResultSchema,
+    CaptureBattlePokemonSchema,
+)
 from app.domain.trainer.battle.service import BattleSessionService
 from app.domain.trainer.pokedex.schema import PokedexSchema
 from app.domain.trainer.pokedex.repository import PokedexRepository
@@ -34,7 +39,7 @@ from app.domain.trainer.schema import (
     TrainerSchema,
 )
 from app.models import Trainer, User, TrainerEncounter, TrainerParty, PokemonEncounter
-from app.models.enums import RoleEnum
+from app.models.enums import BattleSessionStatusEnum, RoleEnum
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -129,6 +134,8 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             user_id=user_id,
             pokeballs=pokeballs,
             capture_rate=capture_rate,
+            base_capture_rate=capture_rate,
+            capture_progress_points=0,
         )
         self.repository.session.add(entity)
         await self.repository.session.flush()
@@ -193,6 +200,8 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 user_id=trainer.user_id,
                 pokeballs=trainer.pokeballs,
                 capture_rate=trainer.capture_rate,
+                base_capture_rate=trainer.base_capture_rate,
+                capture_progress_points=trainer.capture_progress_points,
                 created_at=trainer.created_at,
                 updated_at=trainer.updated_at,
                 deleted_at=trainer.deleted_at,
@@ -210,6 +219,128 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 logger=logger,
                 service="TrainerService",
                 operation="onboard",
+                raise_exception=True,
+            )
+
+    @staticmethod
+    def calculate_effective_capture_rate(
+        *,
+        base_capture_rate: int,
+        capture_progress_points: int,
+    ) -> int:
+        gain = floor(capture_progress_points / 4) + floor(sqrt(capture_progress_points) * 1.5)
+        return min(255, base_capture_rate + gain)
+
+    def apply_capture_progression(
+        self,
+        *,
+        trainer: Trainer,
+        progress_points_awarded: int,
+    ) -> Trainer:
+        trainer.capture_progress_points += progress_points_awarded
+        trainer.capture_rate = self.calculate_effective_capture_rate(
+            base_capture_rate=trainer.base_capture_rate,
+            capture_progress_points=trainer.capture_progress_points,
+        )
+        return trainer
+
+    async def capture_battle_pokemon(
+        self,
+        trainer: Trainer,
+        payload: CaptureBattlePokemonSchema | None = None,
+    ) -> BattleCaptureResultSchema:
+        try:
+            active_battle = await self.battle_session_service.repository.find_active_by_trainer_id(
+                trainer.id
+            )
+            if active_battle is None:
+                latest_battle = await self.battle_session_service.repository.find_latest_by_trainer_id(
+                    trainer.id
+                )
+                if latest_battle is not None and latest_battle.status == BattleSessionStatusEnum.CAPTURED:
+                    raise HTTPException(
+                        status_code=HTTPStatus.CONFLICT,
+                        detail="Trainer already captured this battle Pokemon",
+                    )
+                raise HTTPException(
+                    status_code=HTTPStatus.NOT_FOUND,
+                    detail="Trainer has no active battle",
+                )
+
+            battle_session = active_battle
+
+            if trainer.pokeballs <= 0:
+                raise HTTPException(
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    detail="Trainer has no pokeballs left",
+                )
+
+            trainer.pokeballs -= 1
+            wild_capture_rate = battle_session.wild_pokemon_snapshot.get("capture_rate", 0)
+
+            if trainer.capture_rate < wild_capture_rate:
+                result = await self.battle_session_service.create_ineligible_capture_result(
+                    entity=battle_session,
+                    trainer=trainer,
+                )
+                await self.repository.session.commit()
+                await self.invalidate_home_cache(str(trainer.id))
+                return result
+
+            capture_chance = self.battle_session_service.calculate_capture_chance(
+                trainer_capture_rate=trainer.capture_rate,
+                wild_capture_rate=wild_capture_rate,
+                current_hp=battle_session.wild_pokemon_snapshot["current_hp"],
+                max_hp=battle_session.wild_pokemon_snapshot["max_hp"],
+            )
+
+            if not self.battle_session_service.rolled_capture_success(capture_chance):
+                result = await self.battle_session_service.process_capture_failure(
+                    entity=battle_session,
+                    trainer=trainer,
+                    capture_chance=capture_chance,
+                )
+                await self.repository.session.commit()
+                await self.invalidate_home_cache(str(trainer.id))
+                return result
+
+            was_discovered = await self.pokedex_service.is_discovered(
+                trainer_id=trainer.id,
+                pokemon_name=battle_session.wild_pokemon_name,
+            )
+            my_pokemon = await self.my_pokemon_service.create_owned_for_trainer(
+                trainer_id=trainer.id,
+                pokemon_name=battle_session.wild_pokemon_name,
+                nickname=payload.nickname if payload else None,
+                commit=False,
+            )
+            await self.pokedex_service.discover(
+                trainer=trainer,
+                pokemon_name=battle_session.wild_pokemon_name,
+                commit=False,
+            )
+            progress_points_awarded = 1 if was_discovered else 2
+            self.apply_capture_progression(
+                trainer=trainer,
+                progress_points_awarded=progress_points_awarded,
+            )
+            result = await self.battle_session_service.finalize_capture_success(
+                entity=battle_session,
+                trainer=trainer,
+                my_pokemon=self.my_pokemon_service.to_schema(my_pokemon),
+                progress_points_awarded=progress_points_awarded,
+                capture_chance=capture_chance,
+            )
+            await self.repository.session.commit()
+            await self.invalidate_home_cache(str(trainer.id))
+            return result
+        except Exception as exception:
+            await self.repository.session.rollback()
+            handle_service_exception(
+                exception,
+                logger=logger,
+                service="TrainerService",
+                operation="capture_battle_pokemon",
                 raise_exception=True,
             )
 

@@ -21,6 +21,7 @@ class BattleSessionRepository(BaseRepository[BattleSession]):
     relations = (
         selectinload(BattleSession.turns),
         selectinload(BattleSession.logs),
+        selectinload(BattleSession.trainer),
         selectinload(BattleSession.trainer_active_my_pokemon),
         selectinload(BattleSession.wild_pokemon),
         selectinload(BattleSession.exploration_event),

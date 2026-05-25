@@ -12,9 +12,16 @@ from app.domain.trainer.my_pokemon.service import MyPokemonService
 
 class FakeSession:
     def __init__(self):
+        self.added = []
         self.committed = False
         self.rolled_back = False
         self.refreshed = []
+
+    def add(self, entity):
+        self.added.append(entity)
+
+    async def flush(self):
+        return None
 
     async def commit(self):
         self.committed = True
@@ -296,4 +303,3 @@ async def test_create_owned_for_trainer_rolls_back_when_fresh_entity_is_missing(
     assert error.value.status_code == 500
     assert error.value.detail == "Could not load created My Pokemon"
     assert repository.session.rolled_back is True
-

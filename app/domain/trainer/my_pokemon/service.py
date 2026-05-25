@@ -103,15 +103,15 @@ class MyPokemonService(BaseService[MyPokemonRepository, MyPokemon]):
                 existing_names,
             )
             attributes = build_initial_attributes(base_pokemon)
-            owned = await self.repository.save(
-                entity=MyPokemon(
-                    trainer_id=trainer_id,
-                    pokemon_id=base_pokemon.id,
-                    name=public_name,
-                    nickname=effective_nickname,
-                    **attributes,
-                )
+            owned = MyPokemon(
+                trainer_id=trainer_id,
+                pokemon_id=base_pokemon.id,
+                name=public_name,
+                nickname=effective_nickname,
+                **attributes,
             )
+            self.repository.session.add(owned)
+            await self.repository.session.flush()
 
             await self.my_pokemon_move_service.sync_from_resources(
                 my_pokemon_id=owned.id,
@@ -119,7 +119,7 @@ class MyPokemonService(BaseService[MyPokemonRepository, MyPokemon]):
             )
             if commit:
                 await self.repository.session.commit()
-            await self.repository.session.refresh(owned)
+                await self.repository.session.refresh(owned)
             fresh = await self.repository.find_by(
                 trainer_id=trainer_id,
                 name=public_name,
@@ -129,10 +129,11 @@ class MyPokemonService(BaseService[MyPokemonRepository, MyPokemon]):
                     status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
                     detail="Could not load created My Pokemon",
                 )
-            await self._invalidate_cache(
-                trainer_id=str(trainer_id),
-                identifier=public_name,
-            )
+            if commit:
+                await self._invalidate_cache(
+                    trainer_id=str(trainer_id),
+                    identifier=public_name,
+                )
             return fresh
         except Exception:
             if commit:
