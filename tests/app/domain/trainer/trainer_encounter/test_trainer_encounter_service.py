@@ -10,7 +10,7 @@ from app.domain.trainer.encounter import (
     SelectTrainerEncounterSchema,
     TrainerEncounterService,
 )
-from app.models.enums import ExplorationEventTypeEnum, PokemonStatusEnum, RoleEnum
+from app.models.enums import ExplorationEventTypeEnum, PokemonStatusEnum
 
 
 class FakeSession:
@@ -256,20 +256,6 @@ async def test_invalidate_cache_deletes_encounter_cache_key():
 
 
 @pytest.mark.asyncio
-async def test_get_trainer_or_404_raises_when_trainer_is_missing():
-    repository = FakeRepository(trainer=None)
-    service = TrainerEncounterService(
-        repository,
-        trainer_service=FakeTrainerService(None),
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service._get_trainer_or_404(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
-
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
 async def test_initialize_for_trainer_creates_known_encounters_and_invalidates_caches():
     trainer = build_trainer()
     first = build_encounter(name="route-2", order=2)
@@ -309,37 +295,6 @@ async def test_add_encounters_reuses_existing_entries_and_persists_missing_ones(
 
 
 @pytest.mark.asyncio
-async def test_list_encounters_returns_cache_hit_without_querying_repository():
-    trainer = build_trainer()
-    repository = FakeRepository(trainer)
-    service, _trainer_service = build_service(repository, trainer)
-    cached = [SimpleNamespace(id="cached")]
-    service.encounter_cache_service.get_list = AsyncMock(return_value=cached)
-    repository.list_trainer_encounters = AsyncMock()
-
-    result = await service.list_encounters(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
-
-    assert result == cached
-    repository.list_trainer_encounters.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_list_encounters_serializes_and_caches_repository_entries():
-    trainer = build_trainer()
-    repository = FakeRepository(trainer)
-    repository.encounters = [
-        build_trainer_encounter(trainer, build_encounter(), is_active=True)
-    ]
-    service, _trainer_service = build_service(repository, trainer)
-
-    result = await service.list_encounters(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
-
-    assert len(result) == 1
-    assert result[0].pokemon_encounter.name == "route-1"
-    service.encounter_cache_service.set_list.assert_awaited_once()
-
-
-@pytest.mark.asyncio
 async def test_select_active_encounter_updates_the_active_flag_and_invalidates_home():
     trainer = build_trainer()
     encounter_a = build_trainer_encounter(trainer, build_encounter(), is_active=True)
@@ -350,8 +305,8 @@ async def test_select_active_encounter_updates_the_active_flag_and_invalidates_h
     service, trainer_service = build_service(repository, trainer)
 
     result = await service.select_active_encounter(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-        SelectTrainerEncounterSchema(encounter_id=encounter_b.id),
+        trainer=trainer,
+        payload=SelectTrainerEncounterSchema(encounter_id=encounter_b.id),
     )
 
     assert result.id == encounter_b.id
@@ -372,8 +327,8 @@ async def test_select_active_encounter_raises_when_reload_fails():
 
     with pytest.raises(HTTPException) as exc_info:
         await service.select_active_encounter(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-            SelectTrainerEncounterSchema(encounter_id=encounter.id),
+            trainer=trainer,
+            payload=SelectTrainerEncounterSchema(encounter_id=encounter.id),
         )
 
     assert exc_info.value.status_code == 500
@@ -387,8 +342,8 @@ async def test_select_active_encounter_raises_when_encounter_is_missing():
 
     with pytest.raises(HTTPException) as exc_info:
         await service.select_active_encounter(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-            SelectTrainerEncounterSchema(encounter_id=uuid4()),
+            trainer=trainer,
+            payload=SelectTrainerEncounterSchema(encounter_id=uuid4()),
         )
 
     assert exc_info.value.status_code == 404
@@ -401,7 +356,7 @@ async def test_walk_raises_when_there_is_no_active_encounter():
     service, _trainer_service = build_service(repository, trainer)
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.walk(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+        await service.walk(trainer=trainer)
 
     assert exc_info.value.status_code == 400
 
@@ -415,7 +370,7 @@ async def test_walk_raises_when_trainer_has_active_battle():
     service, _trainer_service = build_service(repository, trainer, battle_service=battle_service)
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.walk(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+        await service.walk(trainer=trainer)
 
     assert exc_info.value.status_code == 409
 
@@ -446,7 +401,7 @@ async def test_walk_creates_wild_pokemon_event(monkeypatch):
         lambda _pokemons: pokemon,
     )
 
-    result = await service.walk(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+    result = await service.walk(trainer=trainer)
 
     assert result.event_type == ExplorationEventTypeEnum.WILD_POKEMON
     assert result.pokemon.name == "pikachu"
@@ -475,7 +430,7 @@ async def test_walk_creates_pokeball_event_and_updates_trainer_inventory(monkeyp
         lambda: 2,
     )
 
-    result = await service.walk(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+    result = await service.walk(trainer=trainer)
 
     assert result.event_type == ExplorationEventTypeEnum.POKEBALLS
     assert result.pokeballs_found == 2

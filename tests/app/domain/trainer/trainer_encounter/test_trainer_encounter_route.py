@@ -85,17 +85,17 @@ async def test_select_active_trainer_encounter_delegates_to_service():
     service = AsyncMock()
     expected = SimpleNamespace(id="encounter-1", is_active=True)
     service.select_active_encounter.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="user-id")
     payload = SelectTrainerEncounterSchema(encounter_id=uuid4())
 
     result = await select_active_trainer_encounter(
         payload,
-        current_user=current_user,
+        current_trainer=current_trainer,
         service=service,
     )
 
     assert result is expected
-    service.select_active_encounter.assert_awaited_once_with(current_user, payload)
+    service.select_active_encounter.assert_awaited_once_with(trainer=current_trainer, payload=payload)
 
 
 @pytest.mark.asyncio
@@ -103,9 +103,9 @@ async def test_walk_trainer_encounter_delegates_to_service():
     service = AsyncMock()
     expected = SimpleNamespace(id="event-1")
     service.walk.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="user-id")
 
-    result = await walk_trainer_encounter(current_user=current_user, service=service)
+    result = await walk_trainer_encounter(current_trainer=current_trainer, service=service)
 
     assert result is expected
-    service.walk.assert_awaited_once_with(current_user)
+    service.walk.assert_awaited_once_with(trainer=current_trainer)

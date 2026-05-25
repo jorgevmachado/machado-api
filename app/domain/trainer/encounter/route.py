@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.pagination import CustomLimitOffsetPage
-from app.core.security import get_current_user
 from app.core.security.security import get_current_trainer
 from app.domain.trainer.encounter.schema import (
     ExplorationEventSchema,
@@ -14,7 +13,7 @@ from app.domain.trainer.encounter.schema import (
     TrainerEncounterSchema,
 )
 from app.domain.trainer.encounter.service import TrainerEncounterService
-from app.models import User, Trainer
+from app.models import Trainer
 from app.shared.schemas import FilterPage
 
 router = APIRouter()
@@ -58,6 +57,7 @@ async def list_trainer_encounters(
     filters = FilterPage.build(page_filter, trainer_id=str(current_trainer.id))
     return await service.list_all_cached(page_filter=filters)
 
+
 @router.get(
     "/{trainer_encounter_id}",
     response_model=TrainerEncounterSchema,
@@ -76,6 +76,7 @@ async def get_trainer_encounter(
         trainer_id=str(current_trainer.id)
     )
 
+
 @router.put(
     "/active",
     response_model=TrainerEncounterSchema,
@@ -83,21 +84,24 @@ async def get_trainer_encounter(
 )
 async def select_active_trainer_encounter(
         payload: SelectTrainerEncounterSchema,
-        current_user: Annotated[User, Depends(get_current_user)],
+        current_trainer: Annotated[Trainer, Depends(get_current_trainer)],
         service: Annotated[
             TrainerEncounterService,
             Depends(get_trainer_encounter_service),
         ],
 ):
-    return await service.select_active_encounter(current_user, payload)
+    return await service.select_active_encounter(
+        trainer=current_trainer,
+        payload=payload
+    )
 
 
 @router.post("/walk", response_model=ExplorationEventSchema, status_code=HTTPStatus.OK)
 async def walk_trainer_encounter(
-        current_user: Annotated[User, Depends(get_current_user)],
+        current_trainer: Annotated[Trainer, Depends(get_current_trainer)],
         service: Annotated[
             TrainerEncounterService,
             Depends(get_trainer_encounter_service),
         ],
 ):
-    return await service.walk(current_user)
+    return await service.walk(trainer=current_trainer)

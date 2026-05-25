@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
+from app.domain.trainer.battle.repository import BattleSessionRepository
+from app.domain.trainer.battle.service import BattleSessionService
 from app.domain.trainer.encounter.business import (
     build_pokeball_reward,
     choose_event_type,
@@ -22,9 +24,7 @@ from app.domain.trainer.encounter.schema import (
     SelectTrainerEncounterSchema,
     TrainerEncounterSchema,
 )
-from app.domain.trainer.battle.repository import BattleSessionRepository
-from app.domain.trainer.battle.service import BattleSessionService
-from app.models import ExplorationEventTypeEnum, Trainer, TrainerEncounter, User, PokemonEncounter
+from app.models import ExplorationEventTypeEnum, Trainer, TrainerEncounter, PokemonEncounter
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -37,10 +37,10 @@ class TrainerEncounterService(
     BaseService[TrainerEncounterRepository, TrainerEncounter, TrainerEncounterSchema]
 ):
     def __init__(
-        self,
-        repository: TrainerEncounterRepository,
-        trainer_service: TrainerService | None = None,
-        battle_session_service: BattleSessionService | None = None,
+            self,
+            repository: TrainerEncounterRepository,
+            trainer_service: TrainerService | None = None,
+            battle_session_service: BattleSessionService | None = None,
     ) -> None:
         super().__init__(
             alias="TrainerEncounters",
@@ -60,8 +60,8 @@ class TrainerEncounterService(
             trainer_service = TrainerService.from_session(session)
         self.trainer_service = trainer_service
         self.battle_session_service = (
-            battle_session_service
-            or BattleSessionService(BattleSessionRepository(session))
+                battle_session_service
+                or BattleSessionService(BattleSessionRepository(session))
         )
         self.encounter_cache_service = self.cache_service
 
@@ -76,19 +76,12 @@ class TrainerEncounterService(
             )
         )
 
-    async def _get_trainer_or_404(self, current_user: User) -> Trainer:
-        trainer = await self.trainer_service.get_by_user_id(current_user.id)
-        if trainer is None:
-            raise HTTPException(
-                status_code=HTTPStatus.NOT_FOUND,
-                detail="Trainer not found",
-            )
-        return trainer
-
-    async def add_encounters(self, trainer_id: str, pokemon_encounters: list[PokemonEncounter]) -> list[TrainerEncounter]:
+    async def add_encounters(self, trainer_id: str, pokemon_encounters: list[PokemonEncounter]) -> list[
+        TrainerEncounter]:
         trainer_encounters: list[TrainerEncounter] = []
         for pokemon_encounter in pokemon_encounters:
-            trainer_encounter = await self.repository.find_by(trainer_id=trainer_id, pokemon_encounter_id=pokemon_encounter.id)
+            trainer_encounter = await self.repository.find_by(trainer_id=trainer_id,
+                                                              pokemon_encounter_id=pokemon_encounter.id)
             if trainer_encounter:
                 trainer_encounters.append(trainer_encounter)
                 continue
@@ -104,11 +97,11 @@ class TrainerEncounterService(
         return trainer_encounters
 
     async def initialize_for_trainer(
-        self,
-        *,
-        trainer_id,
-        starter_pokemon_name: str,
-        commit: bool = True,
+            self,
+            *,
+            trainer_id,
+            starter_pokemon_name: str,
+            commit: bool = True,
     ):
         encounters = await self.repository.list_encounters_for_pokemon(starter_pokemon_name)
         active_encounter = resolve_initial_active_encounter(encounters)
@@ -131,16 +124,11 @@ class TrainerEncounterService(
                 result.append(fresh)
         return result
 
-    async def list_encounters(self, current_user: User) -> list[TrainerEncounterSchema]:
-        trainer = await self._get_trainer_or_404(current_user)
-        return await super().list_all_cached(trainer_id=str(trainer.id))
-
     async def select_active_encounter(
-        self,
-        current_user: User,
-        payload: SelectTrainerEncounterSchema,
+            self,
+            trainer: Trainer,
+            payload: SelectTrainerEncounterSchema,
     ) -> TrainerEncounterSchema:
-        trainer = await self._get_trainer_or_404(current_user)
         entity = await self.repository.find_by(
             trainer_id=trainer.id,
             id=payload.encounter_id,
@@ -166,8 +154,7 @@ class TrainerEncounterService(
             )
         return self.to_encounter_schema(fresh)
 
-    async def walk(self, current_user: User) -> ExplorationEventSchema:
-        trainer = await self._get_trainer_or_404(current_user)
+    async def walk(self, trainer: Trainer) -> ExplorationEventSchema:
         if await self.battle_session_service.has_active_battle(trainer.id):
             raise HTTPException(
                 status_code=HTTPStatus.CONFLICT,
@@ -229,8 +216,8 @@ class TrainerEncounterService(
         )
 
     async def get_active_encounter_by_trainer_id(
-        self,
-        trainer_id: UUID,
+            self,
+            trainer_id: UUID,
     ) -> TrainerEncounterSchema | None:
         entity = await self.repository.find_active_trainer_encounter(trainer_id)
         if entity is None:
@@ -243,16 +230,16 @@ class TrainerEncounterService(
 
     @staticmethod
     def to_event_schema(
-        entity,
-        active_encounter=None,
-        battle_session=None,
+            entity,
+            active_encounter=None,
+            battle_session=None,
     ) -> ExplorationEventSchema:
         payload = entity.payload or {}
         pokemon = None
         encounter = active_encounter.pokemon_encounter if active_encounter else None
         if (
-            entity.event_type == ExplorationEventTypeEnum.WILD_POKEMON
-            and active_encounter is not None
+                entity.event_type == ExplorationEventTypeEnum.WILD_POKEMON
+                and active_encounter is not None
         ):
             pokemon_id = payload.get("pokemon_id")
             pokemon = next(
