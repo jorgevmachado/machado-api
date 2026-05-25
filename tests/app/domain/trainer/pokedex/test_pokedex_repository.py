@@ -64,7 +64,7 @@ async def test_find_by_returns_matching_entity():
     session.scalar_result = SimpleNamespace(pokemon=SimpleNamespace(name="bulbasaur"))
     repository = PokedexRepository(session)
 
-    result = await repository.find_by(trainer_id=uuid4(), name="bulbasaur")
+    result = await repository.find_by(trainer_id=uuid4(), pokemon_name="bulbasaur")
 
     assert result.pokemon.name == "bulbasaur"
 

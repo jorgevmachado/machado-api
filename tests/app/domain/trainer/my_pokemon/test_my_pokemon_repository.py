@@ -62,14 +62,3 @@ async def test_find_by_applies_id_and_pokemon_name_filters():
     )
 
     assert result.name == 'bulbasaur'
-
-
-@pytest.mark.asyncio
-async def test_find_base_pokemon_returns_base_catalog_entry():
-    session = FakeSession()
-    session.scalar_result = SimpleNamespace(name="bulbasaur")
-    repository = MyPokemonRepository(session)
-
-    result = await repository.find_base_pokemon("bulbasaur")
-
-    assert result.name == "bulbasaur"

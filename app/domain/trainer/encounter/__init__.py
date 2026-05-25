@@ -12,6 +12,7 @@ from app.domain.trainer.encounter.repository import (
 )
 from app.domain.trainer.encounter.route import (
     get_trainer_encounter_service,
+    get_trainer_encounter,
     list_trainer_encounters,
     router,
     select_active_trainer_encounter,
@@ -35,6 +36,7 @@ __all__ = [
     "TrainerEncounterRepository",
     "get_trainer_encounter_service",
     "list_trainer_encounters",
+    "get_trainer_encounter",
     "router",
     "select_active_trainer_encounter",
     "walk_trainer_encounter",

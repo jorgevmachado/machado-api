@@ -58,6 +58,23 @@ async def list_trainer_encounters(
     filters = FilterPage.build(page_filter, trainer_id=str(current_trainer.id))
     return await service.list_all_cached(page_filter=filters)
 
+@router.get(
+    "/{trainer_encounter_id}",
+    response_model=TrainerEncounterSchema,
+    status_code=HTTPStatus.OK,
+)
+async def get_trainer_encounter(
+        trainer_encounter_id: str,
+        current_trainer: Annotated[Trainer, Depends(get_current_trainer)],
+        service: Annotated[
+            TrainerEncounterService,
+            Depends(get_trainer_encounter_service),
+        ],
+):
+    return await service.find_one_cached(
+        param=trainer_encounter_id,
+        trainer_id=str(current_trainer.id)
+    )
 
 @router.put(
     "/active",

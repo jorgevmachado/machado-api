@@ -735,3 +735,16 @@ class TestBaseRepositoryFindBy:
         assert result == expected_entity
         assert "pokemons.name" in str(query)
         assert "pokedex_test.trainer_id" in str(query)
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_find_by_returns_none_when_one_of_filters_no_valid():
+        mock_session = AsyncMock()
+        expected_entity = types.SimpleNamespace(name="pikachu")
+        mock_session.scalar = AsyncMock(return_value=expected_entity)
+        repository = PokedexBaseRepository(session=mock_session)
+
+        result = await repository.find_by(trainer_id=uuid4(), name="bulbasaur")
+
+        assert result is None
+        mock_session.scalar.assert_not_called()

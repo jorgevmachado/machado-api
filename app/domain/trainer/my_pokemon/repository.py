@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.repository.base import BaseRepository
@@ -21,10 +20,3 @@ class MyPokemonRepository(BaseRepository[MyPokemon]):
         selectinload(MyPokemon.trainer),
         selectinload(MyPokemon.moves).selectinload(MyPokemonMove.pokemon_move),
     )
-
-    async def find_base_pokemon(self, pokemon_name: str) -> Pokemon | None:
-        query = select(Pokemon).where(
-            Pokemon.name == pokemon_name,
-            Pokemon.deleted_at.is_(None),
-        )
-        return await self.session.scalar(query)

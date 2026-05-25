@@ -11,7 +11,7 @@ from app.domain.trainer.encounter import (
     walk_trainer_encounter,
 )
 from app.domain.trainer.encounter import SelectTrainerEncounterSchema
-from app.domain.trainer.encounter.route import get_trainer_encounter_filter
+from app.domain.trainer.encounter.route import get_trainer_encounter_filter, get_trainer_encounter
 from app.domain.trainer.encounter import TrainerEncounterService
 from app.shared.schemas import FilterPage
 
@@ -60,6 +60,25 @@ async def test_list_trainer_encounters_delegates_to_service():
     assert called_filter.limit == page_filter.limit
     assert called_filter.clean_cache == page_filter.clean_cache
 
+@pytest.mark.asyncio
+async def test_get_trainer_encounter_delegates_to_service():
+    service = AsyncMock()
+    expected = SimpleNamespace(id="encounter-1")
+    service.find_one_cached.return_value = expected
+    current_trainer = SimpleNamespace(id="user-id")
+    encounter_id = "encounter-1"
+
+    result = await get_trainer_encounter(
+        encounter_id,
+        current_trainer=current_trainer,
+        service=service,
+    )
+
+    assert result is expected
+    service.find_one_cached.assert_awaited_once_with(
+        param=encounter_id,
+        trainer_id=current_trainer.id
+    )
 
 @pytest.mark.asyncio
 async def test_select_active_trainer_encounter_delegates_to_service():
