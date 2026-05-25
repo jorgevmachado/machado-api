@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.security import get_current_user
+from app.core.security import get_current_trainer
+
 from app.domain.trainer.trainer_party.schema import (
     TrainerPartyMemberSchema,
     UpdateTrainerPartySchema,
@@ -24,16 +25,16 @@ def get_trainer_party_service(session: Session) -> TrainerPartyService:
 
 @router.get("/party", response_model=list[TrainerPartyMemberSchema], status_code=HTTPStatus.OK)
 async def get_trainer_party(
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_trainer: Annotated[User, Depends(get_current_trainer)],
     service: Annotated[TrainerPartyService, Depends(get_trainer_party_service)],
 ):
-    return await service.get_party(current_user)
+    return await service.get_party(trainer=current_trainer)
 
 
 @router.put("/party", response_model=list[TrainerPartyMemberSchema], status_code=HTTPStatus.OK)
 async def update_trainer_party(
     payload: UpdateTrainerPartySchema,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_trainer: Annotated[User, Depends(get_current_trainer)],
     service: Annotated[TrainerPartyService, Depends(get_trainer_party_service)],
 ):
-    return await service.update_party(current_user, payload)
+    return await service.update_party(trainer=current_trainer, payload=payload)

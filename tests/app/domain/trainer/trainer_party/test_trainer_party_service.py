@@ -10,7 +10,7 @@ from app.domain.trainer.trainer_party import (
     TrainerPartyService,
     UpdateTrainerPartySchema,
 )
-from app.models.enums import PokemonStatusEnum, RoleEnum
+from app.models.enums import PokemonStatusEnum
 
 
 class FakeSession:
@@ -173,20 +173,6 @@ def build_service(repository, trainer):
 
 
 @pytest.mark.asyncio
-async def test_get_trainer_or_404_raises_when_trainer_is_missing():
-    repository = FakeRepository(trainer=None)
-    service = TrainerPartyService(
-        repository,
-        trainer_service=FakeTrainerService(None),
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service._get_trainer_or_404(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
-
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
 async def test_update_party_raises_for_invalid_owned_pokemon_ids():
     trainer = build_trainer()
     repository = FakeRepository(trainer)
@@ -195,8 +181,8 @@ async def test_update_party_raises_for_invalid_owned_pokemon_ids():
 
     with pytest.raises(HTTPException) as exc_info:
         await service.update_party(
-            SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-            UpdateTrainerPartySchema(my_pokemon_ids=[uuid4(), uuid4()]),
+            trainer=trainer,
+            payload=UpdateTrainerPartySchema(my_pokemon_ids=[uuid4(), uuid4()]),
         )
 
     assert exc_info.value.status_code == 400
@@ -211,8 +197,8 @@ async def test_update_party_replaces_active_party_and_invalidates_caches():
     service, trainer_service = build_service(repository, trainer)
 
     result = await service.update_party(
-        SimpleNamespace(id=uuid4(), role=RoleEnum.USER),
-        UpdateTrainerPartySchema(my_pokemon_ids=[owned[0].id, owned[1].id]),
+        trainer=trainer,
+        payload=UpdateTrainerPartySchema(my_pokemon_ids=[owned[0].id, owned[1].id]),
     )
 
     assert [entry.slot for entry in result] == [1, 2]
@@ -231,7 +217,7 @@ async def test_get_party_returns_cache_hit_without_querying_repository():
     service.party_cache_service.get_list = AsyncMock(return_value=cached)
     repository.list_active_party = AsyncMock()
 
-    result = await service.get_party(SimpleNamespace(id=uuid4(), role=RoleEnum.USER))
+    result = await service.get_party(trainer=trainer, )
 
     assert result == cached
     repository.list_active_party.assert_not_awaited()

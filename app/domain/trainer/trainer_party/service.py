@@ -17,7 +17,7 @@ from app.domain.trainer.trainer_party.schema import (
     TrainerPartyMemberSchema,
     UpdateTrainerPartySchema,
 )
-from app.models import MyPokemon, TrainerParty, User
+from app.models import MyPokemon, TrainerParty, Trainer
 from app.models.common import utcnow
 
 logger = logging.getLogger(__name__)
@@ -30,9 +30,9 @@ class TrainerPartyService(
     BaseService[TrainerPartyRepository, TrainerParty, TrainerPartyMemberSchema]
 ):
     def __init__(
-        self,
-        repository: TrainerPartyRepository,
-        trainer_service: TrainerService | None = None,
+            self,
+            repository: TrainerPartyRepository,
+            trainer_service: TrainerService | None = None,
     ) -> None:
         super().__init__(
             alias="TrainerParty",
@@ -65,24 +65,14 @@ class TrainerPartyService(
     def _party_key(self, trainer_id: str) -> str:
         return self.party_cache_service.cache.build_key("trainer", "party", trainer_id)
 
-    async def _get_trainer_or_404(self, current_user: User):
-        trainer = await self.trainer_service.get_by_user_id(current_user.id)
-        if trainer is None:
-            raise HTTPException(
-                status_code=HTTPStatus.NOT_FOUND,
-                detail="Trainer not found",
-            )
-        return trainer
-
     async def _invalidate_party_cache(self, trainer_id: str) -> None:
         await self.party_cache_service.cache.delete_cache(self._party_key(trainer_id))
 
     async def update_party(
-        self,
-        current_user: User,
-        payload: UpdateTrainerPartySchema,
+            self,
+            trainer: Trainer,
+            payload: UpdateTrainerPartySchema,
     ) -> list[TrainerPartyMemberSchema]:
-        trainer = await self._get_trainer_or_404(current_user)
         validate_party_selection(payload.my_pokemon_ids)
         my_pokemons = await self.repository.list_owned_my_pokemon(
             trainer.id,
@@ -107,13 +97,12 @@ class TrainerPartyService(
         await self.trainer_service.invalidate_home_cache(str(trainer.id))
         return await self.get_party_by_trainer_id(trainer.id)
 
-    async def get_party(self, current_user: User) -> list[TrainerPartyMemberSchema]:
-        trainer = await self._get_trainer_or_404(current_user)
+    async def get_party(self, trainer: Trainer) -> list[TrainerPartyMemberSchema]:
         return await self.get_party_by_trainer_id(trainer.id)
 
     async def get_party_by_trainer_id(
-        self,
-        trainer_id: UUID,
+            self,
+            trainer_id: UUID,
     ) -> list[TrainerPartyMemberSchema]:
         key = self._party_key(str(trainer_id))
         cached = await self.party_cache_service.get_list(key)

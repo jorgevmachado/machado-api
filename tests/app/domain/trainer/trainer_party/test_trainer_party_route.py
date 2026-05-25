@@ -23,12 +23,12 @@ async def test_get_trainer_party_delegates_to_service():
     service = AsyncMock()
     expected = [SimpleNamespace(id="party-1")]
     service.get_party.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="user-id")
 
-    result = await get_trainer_party(current_user=current_user, service=service)
+    result = await get_trainer_party(current_trainer=current_trainer, service=service)
 
     assert result is expected
-    service.get_party.assert_awaited_once_with(current_user)
+    service.get_party.assert_awaited_once_with(trainer=current_trainer)
 
 
 @pytest.mark.asyncio
@@ -36,14 +36,14 @@ async def test_update_trainer_party_delegates_to_service():
     service = AsyncMock()
     expected = [SimpleNamespace(id="party-1")]
     service.update_party.return_value = expected
-    current_user = SimpleNamespace(id="user-id")
+    current_trainer = SimpleNamespace(id="user-id")
     payload = UpdateTrainerPartySchema(my_pokemon_ids=[uuid4()])
 
     result = await update_trainer_party(
         payload,
-        current_user=current_user,
+        current_trainer=current_trainer,
         service=service,
     )
 
     assert result is expected
-    service.update_party.assert_awaited_once_with(current_user, payload)
+    service.update_party.assert_awaited_once_with(trainer=current_trainer, payload=payload)
