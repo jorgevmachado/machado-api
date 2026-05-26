@@ -11,9 +11,11 @@ from app.models.enums import (
 )
 from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
 from app.models.exploration_event import ExplorationEvent
+from app.models.healing_log import HealingLog
 from app.models.my_pokemon import MyPokemon
 from app.models.my_pokemon_move import MyPokemonMove
 from app.models.pokedex import Pokedex
+from app.models.pokemon_center_healing import PokemonCenterHealing
 from app.models.pokemon import Pokemon
 from app.models.pokemon_ability import PokemonAbility
 from app.models.pokemon_ability_link import PokemonAbilityLink
@@ -45,11 +47,13 @@ __all__ = [
     "BattleLogTypeEnum",
     "BattleSessionStatusEnum",
     "ExplorationEvent",
+    "HealingLog",
     "ExplorationEventTypeEnum",
     "GenderEnum",
     "MyPokemon",
     "MyPokemonMove",
     "Pokedex",
+    "PokemonCenterHealing",
     "Pokemon",
     "PokemonAbility",
     "PokemonAbilityLink",

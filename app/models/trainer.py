@@ -13,8 +13,10 @@ from app.models.common import utcnow
 if TYPE_CHECKING:
     from app.models.battle_session import BattleSession
     from app.models.exploration_event import ExplorationEvent
+    from app.models.healing_log import HealingLog
     from app.models.my_pokemon import MyPokemon
     from app.models.pokedex import Pokedex
+    from app.models.pokemon_center_healing import PokemonCenterHealing
     from app.models.trainer_encounter import TrainerEncounter
     from app.models.trainer_party import TrainerParty
 
@@ -78,6 +80,20 @@ class Trainer:
         back_populates="trainer",
     )
     battle_sessions: Mapped[list["BattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+    pokemon_center_healings: Mapped[list["PokemonCenterHealing"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+    healing_logs: Mapped[list["HealingLog"]] = relationship(
         lazy=default_lazy,
         default_factory=list,
         init=False,

@@ -183,6 +183,34 @@ def test_service_init_builds_default_dependencies_from_session():
     assert service.my_pokemon_move_service is move_service_instance
 
 
+def test_from_session_builds_service_with_repository():
+    session = FakeSession()
+    repository = FakeRepository(base_pokemon=build_base_pokemon())
+
+    with (
+        patch(
+            "app.domain.trainer.my_pokemon.service.MyPokemonRepository",
+            return_value=repository,
+        ) as repository_factory,
+        patch(
+            "app.domain.trainer.service.TrainerService.from_session",
+            return_value=SimpleNamespace(name="trainer-service"),
+        ),
+        patch(
+            "app.domain.pokemon.service.PokemonService.from_session",
+            return_value=SimpleNamespace(name="pokemon-service"),
+        ),
+        patch(
+            "app.domain.trainer.my_pokemon.move.service.MyPokemonMoveService.from_session",
+            return_value=SimpleNamespace(name="move-service"),
+        ),
+    ):
+        service = MyPokemonService.from_session(session)
+
+    repository_factory.assert_called_once_with(session)
+    assert isinstance(service, MyPokemonService)
+
+
 @pytest.mark.asyncio
 async def test_create_delegates_to_create_owned_for_trainer():
     repository = FakeRepository(base_pokemon=build_base_pokemon())
@@ -303,3 +331,26 @@ async def test_create_owned_for_trainer_rolls_back_when_fresh_entity_is_missing(
     assert error.value.status_code == 500
     assert error.value.detail == "Could not load created My Pokemon"
     assert repository.session.rolled_back is True
+
+
+def test_apply_full_healing_skips_deleted_moves():
+    entity = SimpleNamespace(
+        hp=20,
+        max_hp=20,
+        updated_at=None,
+        moves=[
+            SimpleNamespace(
+                pp=1,
+                max_pp=10,
+                deleted_at="2026-05-26T00:00:00Z",
+                updated_at=None,
+            )
+        ],
+    )
+
+    result = MyPokemonService.apply_full_healing(entity)
+
+    assert result["restored_hp"] == 0
+    assert result["restored_pp"] == 0
+    assert result["changed"] is False
+    assert entity.moves[0].pp == 1

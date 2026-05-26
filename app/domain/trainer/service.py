@@ -19,6 +19,8 @@ from app.domain.trainer.my_pokemon.business import (
     STARTER_POKEMON_NAMES,
 )
 from app.domain.trainer.my_pokemon.repository import MyPokemonRepository
+from app.domain.trainer.pokemon_center.repository import PokemonCenterRepository
+from app.domain.trainer.pokemon_center.schema import LastHealingSummarySchema
 from app.domain.trainer.battle.repository import BattleSessionRepository
 from app.domain.trainer.battle.schema import (
     BattleCaptureResultSchema,
@@ -108,6 +110,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             logger_params=self.logger_params,
             schema_class=TrainerHomeSchema,
         )
+        self.pokemon_center_repository = PokemonCenterRepository(repository.session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -381,6 +384,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             trainer.id
         )
         latest_discoveries = await self.pokedex_service.list_latest_discoveries(trainer.id)
+        latest_healing = await self.pokemon_center_repository.find_latest_by_trainer_id(trainer.id)
         serialized = TrainerHomeSchema(
             party=[
                 TrainerPartyMemberSchema.model_validate(party) for party in parties
@@ -394,6 +398,11 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             latest_discoveries = [
                 PokedexSchema.model_validate(entry) for entry in latest_discoveries
             ],
+            last_healing=(
+                LastHealingSummarySchema.model_validate(latest_healing)
+                if latest_healing is not None
+                else None
+            ),
         )
         # await self.home_cache_service.set_one(key, serialized)
         return serialized

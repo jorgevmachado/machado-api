@@ -12,6 +12,7 @@ from app.models.common import utcnow
 
 if TYPE_CHECKING:
     from app.models.battle_session import BattleSession
+    from app.models.healing_log import HealingLog
     from app.models.my_pokemon_move import MyPokemonMove
     from app.models.pokemon import Pokemon
     from app.models.trainer import Trainer
@@ -82,4 +83,11 @@ class MyPokemon:
         init=False,
         repr=False,
         back_populates="trainer_active_my_pokemon",
+    )
+    healing_logs: Mapped[list["HealingLog"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="my_pokemon",
     )

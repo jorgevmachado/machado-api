@@ -210,6 +210,7 @@ def build_service(
     party=None,
     latest_discoveries=None,
     active_battle=None,
+    latest_healing=None,
 ):
     repository = FakeRepository(trainer=trainer)
     service = TrainerService(
@@ -223,6 +224,7 @@ def build_service(
     service.home_cache_service.get_one = AsyncMock(return_value=None)
     service.home_cache_service.set_one = AsyncMock()
     service.home_cache_service.cache.delete_cache = AsyncMock()
+    service.pokemon_center_repository.find_latest_by_trainer_id = AsyncMock(return_value=latest_healing)
     return service
 
 

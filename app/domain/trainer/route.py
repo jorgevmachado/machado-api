@@ -10,6 +10,7 @@ from app.domain.trainer.battle.route import router as battle_router
 from app.domain.trainer.encounter.route import router as trainer_encounter_router
 from app.domain.trainer.encounter.schema import TrainerHomeSchema
 from app.domain.trainer.my_pokemon.route import router as my_pokemon_router
+from app.domain.trainer.pokemon_center.route import router as pokemon_center_router
 from app.domain.trainer.pokedex.route import router as pokedex_router
 from app.domain.trainer.schema import (
     OnboardingTrainerSchema,
@@ -22,6 +23,7 @@ from app.models import User, Trainer
 router = APIRouter(prefix="/trainer", tags=["trainer"])
 router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
 router.include_router(my_pokemon_router, prefix="/my-pokemon", tags=["My Pokemon"])
+router.include_router(pokemon_center_router, tags=["Pokemon Center"])
 router.include_router(trainer_party_router, tags=["Trainer Party"])
 router.include_router(trainer_encounter_router, prefix="/encounter", tags=["Trainer Encounter"])
 router.include_router(battle_router, tags=["Battle Session"])

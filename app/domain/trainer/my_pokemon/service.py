@@ -5,6 +5,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
@@ -22,6 +23,7 @@ from app.domain.trainer.my_pokemon.schema import (
 )
 from app.domain.trainer.progression.business import build_initial_attributes
 from app.models import MyPokemon, Trainer
+from app.models.common import utcnow
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,38 @@ class MyPokemonService(BaseService[MyPokemonRepository, MyPokemon]):
             my_pokemon_move_service = MyPokemonMoveService.from_session(session)
         self.my_pokemon_move_service = my_pokemon_move_service
         self.list_cache_service = self.cache_service
+
+    @classmethod
+    def from_session(cls, session: AsyncSession) -> "MyPokemonService":
+        return cls(MyPokemonRepository(session))
+
+    @staticmethod
+    def apply_full_healing(entity: MyPokemon) -> dict[str, int | bool]:
+        healed_at = utcnow()
+        restored_hp = max(entity.max_hp - entity.hp, 0)
+        restored_pp = 0
+        was_revived = entity.hp == 0 and entity.max_hp > 0
+
+        if restored_hp > 0:
+            entity.hp = entity.max_hp
+            entity.updated_at = healed_at
+
+        for move in entity.moves:
+            if move.deleted_at is not None:
+                continue
+            restored_move_pp = max(move.max_pp - move.pp, 0)
+            if restored_move_pp <= 0:
+                continue
+            move.pp = move.max_pp
+            move.updated_at = healed_at
+            restored_pp += restored_move_pp
+
+        return {
+            "restored_hp": restored_hp,
+            "restored_pp": restored_pp,
+            "was_revived": was_revived,
+            "changed": restored_hp > 0 or restored_pp > 0,
+        }
 
     async def create(
             self,

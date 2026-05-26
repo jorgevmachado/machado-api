@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.trainer.my_pokemon.schema import MyPokemonSchema
+from app.domain.trainer.pokemon_center.schema import LastHealingSummarySchema
 from app.domain.trainer.pokedex.schema import PokedexPokemonSummarySchema, PokedexSchema
 from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
 from app.domain.trainer.schema import TrainerSchema
@@ -67,3 +68,4 @@ class TrainerHomeSchema(BaseModel):
     active_encounter: TrainerEncounterSchema | None = None
     latest_discoveries: list[PokedexSchema] = Field(default_factory=list)
     active_battle: ActiveBattleSummarySchema | None = None
+    last_healing: LastHealingSummarySchema | None = None
