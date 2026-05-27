@@ -49,3 +49,10 @@ rollback-migration:
 
 migrate:
 	poetry run alembic upgrade head
+
+domain:
+	@if [ -z "$(name)" ]; then \
+		echo "Error: name variable is required. Usage: make domain name=ability [path=/pokemon]"; \
+		exit 1; \
+	fi
+	bash scripts/create_domain.sh "$(path)" "$(name)"

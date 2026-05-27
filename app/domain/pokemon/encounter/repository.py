@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from app.core.repository.base import BaseRepository
-from app.models import PokemonEncounter
+from app.models.encounter import Encounter
 
 
-class PokemonEncounterRepository(BaseRepository[PokemonEncounter]):
-    model = PokemonEncounter
-    default_order_by = "order"
+class EncounterRepository(BaseRepository[Encounter]):
+    model = Encounter

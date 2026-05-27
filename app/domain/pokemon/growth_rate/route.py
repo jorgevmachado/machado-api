@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from http import HTTPStatus
 from typing import Annotated
 
@@ -5,24 +7,30 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.pagination import CustomLimitOffsetPage
 from app.core.security import get_current_user
-from app.domain.pokemon.growth_rate.repository import PokemonGrowthRateRepository
-from app.core.pagination.schemas import CustomLimitOffsetPage
-from app.domain.pokemon.growth_rate.service import PokemonGrowthRateService
-from app.domain.pokemon.growth_rate.schema import PokemonGrowthRateSchema
-from app.models import User
+
+from app.models.user import User
+
 from app.shared.schemas import FilterPage
+
+from app.domain.pokemon.growth_rate.repository import GrowthRateRepository
+from app.domain.pokemon.growth_rate.schema import GrowthRateSchema
+from app.domain.pokemon.growth_rate.service import GrowthRateService
 
 router = APIRouter()
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_pokemon_growth_rate_service(session: Session) -> PokemonGrowthRateService:
-    return PokemonGrowthRateService(PokemonGrowthRateRepository(session))
+def get_growth_rate_service(session: Session) -> GrowthRateService:
+    return GrowthRateService(GrowthRateRepository(session))
+
+Service = Annotated[GrowthRateService, Depends(get_growth_rate_service)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_pokemon_growth_rate_filter(
+def get_growth_rate_filter(
     page: int | None = None,
     offset: int | None = None,
     limit: int | None = 12,
@@ -41,29 +49,29 @@ def get_pokemon_growth_rate_filter(
 
 
 @router.get(
-    "",
-    response_model=CustomLimitOffsetPage[PokemonGrowthRateSchema]
-    | list[PokemonGrowthRateSchema],
-    status_code=HTTPStatus.OK,
+    '',
+    response_model=CustomLimitOffsetPage[GrowthRateSchema]| list[GrowthRateSchema],
+    status_code=HTTPStatus.OK
 )
-async def list_pokemon_abilities(
-    _: Annotated[User, Depends(get_current_user)],
-    service: Annotated[
-        PokemonGrowthRateService, Depends(get_pokemon_growth_rate_service)
-    ],
-    page_filter: Annotated[FilterPage, Depends(get_pokemon_growth_rate_filter)] = None,
+async def list_all(
+        service: Service,
+        current_user: CurrentUser,
+        page_filter: Annotated[FilterPage, Depends(get_growth_rate_filter)] = None,
 ):
-    return await service.list_all_cached(page_filter=page_filter)
+    return await service.list_all_cached(
+        page_filter=page_filter,
+        user_request=current_user.username,
+    )
 
 
 @router.get(
-    "/{identifier}", response_model=PokemonGrowthRateSchema, status_code=HTTPStatus.OK
+    '/{param}',
+    response_model=GrowthRateSchema,
+    status_code=HTTPStatus.OK
 )
-async def get_pokemon_growth_rate(
-    identifier: str,
-    _: Annotated[User, Depends(get_current_user)],
-    service: Annotated[
-        PokemonGrowthRateService, Depends(get_pokemon_growth_rate_service)
-    ],
-):
-    return await service.find_one_cached(param=identifier)
+async def find_one(param: str, service: Service, current_user: CurrentUser):
+    return await service.find_one_cached(
+        param=param,
+        user_request=current_user.username,
+    )
+

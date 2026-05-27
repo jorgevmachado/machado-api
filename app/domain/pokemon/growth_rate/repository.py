@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from app.core.repository.base import BaseRepository
-from app.models import PokemonGrowthRate
+from app.models.growth_rate import GrowthRate
 
 
-class PokemonGrowthRateRepository(BaseRepository[PokemonGrowthRate]):
-    model = PokemonGrowthRate
-    default_order_by = "order"
+class GrowthRateRepository(BaseRepository[GrowthRate]):
+    model = GrowthRate

@@ -1,13 +1,8 @@
-from sqlalchemy.orm import selectinload
+from __future__ import annotations
 
 from app.core.repository.base import BaseRepository
-from app.models import PokemonType
+from app.models.type import Type
 
 
-class PokemonTypeRepository(BaseRepository[PokemonType]):
-    model = PokemonType
-    default_order_by = "order"
-    relations = (
-        selectinload(PokemonType.weaknesses),
-        selectinload(PokemonType.strengths),
-    )
+class TypeRepository(BaseRepository[Type]):
+    model = Type

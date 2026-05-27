@@ -1,25 +1,8 @@
-from uuid import UUID
-
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from __future__ import annotations
 
 from app.core.repository.base import BaseRepository
-from app.models import PokemonImage
+from app.models.image import Image
 
 
-class PokemonImageRepository(BaseRepository[PokemonImage]):
-    model = PokemonImage
-
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-
-    async def replace_for_pokemon(
-        self, pokemon_id: UUID, images: list[PokemonImage]
-    ) -> list[PokemonImage]:
-        await self.session.execute(
-            delete(PokemonImage).where(PokemonImage.pokemon_id == pokemon_id)
-        )
-        for image in images:
-            self.session.add(image)
-        await self.session.flush()
-        return images
+class ImageRepository(BaseRepository[Image]):
+    model = Image

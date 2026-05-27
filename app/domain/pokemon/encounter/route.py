@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from http import HTTPStatus
 from typing import Annotated
 
@@ -5,24 +7,30 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.pagination import CustomLimitOffsetPage
 from app.core.security import get_current_user
-from app.domain.pokemon.encounter.repository import PokemonEncounterRepository
-from app.core.pagination.schemas import CustomLimitOffsetPage
-from app.domain.pokemon.encounter.service import PokemonEncounterService
-from app.domain.pokemon.encounter.schema import PokemonEncounterSchema
-from app.models import User
+
+from app.models.user import User
+
 from app.shared.schemas import FilterPage
+
+from app.domain.pokemon.encounter.repository import EncounterRepository
+from app.domain.pokemon.encounter.schema import EncounterSchema
+from app.domain.pokemon.encounter.service import EncounterService
 
 router = APIRouter()
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_pokemon_encounter_service(session: Session) -> PokemonEncounterService:
-    return PokemonEncounterService(repository=PokemonEncounterRepository(session))
+def get_encounter_service(session: Session) -> EncounterService:
+    return EncounterService(EncounterRepository(session))
+
+Service = Annotated[EncounterService, Depends(get_encounter_service)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_pokemon_encounter_filter(
+def get_encounter_filter(
     page: int | None = None,
     offset: int | None = None,
     limit: int | None = 12,
@@ -41,25 +49,29 @@ def get_pokemon_encounter_filter(
 
 
 @router.get(
-    "",
-    response_model=CustomLimitOffsetPage[PokemonEncounterSchema]
-    | list[PokemonEncounterSchema],
-    status_code=HTTPStatus.OK,
+    '',
+    response_model=CustomLimitOffsetPage[EncounterSchema]| list[EncounterSchema],
+    status_code=HTTPStatus.OK
 )
-async def list_pokemon_encounter(
-    _: Annotated[User, Depends(get_current_user)],
-    service: Annotated[PokemonEncounterService, Depends(get_pokemon_encounter_service)],
-    page_filter: Annotated[FilterPage, Depends(get_pokemon_encounter_filter)] = None,
+async def list_all(
+        service: Service,
+        current_user: CurrentUser,
+        page_filter: Annotated[FilterPage, Depends(get_encounter_filter)] = None,
 ):
-    return await service.list_all_cached(page_filter=page_filter)
+    return await service.list_all_cached(
+        page_filter=page_filter,
+        user_request=current_user.username,
+    )
 
 
 @router.get(
-    "/{identifier}", response_model=PokemonEncounterSchema, status_code=HTTPStatus.OK
+    '/{param}',
+    response_model=EncounterSchema,
+    status_code=HTTPStatus.OK
 )
-async def get_pokemon_encounter(
-    identifier: str,
-    _: Annotated[User, Depends(get_current_user)],
-    service: Annotated[PokemonEncounterService, Depends(get_pokemon_encounter_service)],
-):
-    return await service.find_one_cached(param=identifier)
+async def find_one(param: str, service: Service, current_user: CurrentUser):
+    return await service.find_one_cached(
+        param=param,
+        user_request=current_user.username,
+    )
+

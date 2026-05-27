@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from http import HTTPStatus
 from typing import Annotated
 
@@ -5,24 +7,30 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.pagination import CustomLimitOffsetPage
 from app.core.security import get_current_user
-from app.domain.pokemon.type.repository import PokemonTypeRepository
-from app.core.pagination.schemas import CustomLimitOffsetPage
-from app.domain.pokemon.type.service import PokemonTypeService
-from app.domain.pokemon.type.schema import PokemonTypeSchema
-from app.models import User
+
+from app.models.user import User
+
 from app.shared.schemas import FilterPage
+
+from app.domain.pokemon.type.repository import TypeRepository
+from app.domain.pokemon.type.schema import TypeSchema
+from app.domain.pokemon.type.service import TypeService
 
 router = APIRouter()
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_pokemon_type_service(session: Session) -> PokemonTypeService:
-    return PokemonTypeService(PokemonTypeRepository(session))
+def get_type_service(session: Session) -> TypeService:
+    return TypeService(TypeRepository(session))
+
+Service = Annotated[TypeService, Depends(get_type_service)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_pokemon_type_filter(
+def get_type_filter(
     page: int | None = None,
     offset: int | None = None,
     limit: int | None = 12,
@@ -41,24 +49,29 @@ def get_pokemon_type_filter(
 
 
 @router.get(
-    "",
-    response_model=CustomLimitOffsetPage[PokemonTypeSchema] | list[PokemonTypeSchema],
-    status_code=HTTPStatus.OK,
+    '',
+    response_model=CustomLimitOffsetPage[TypeSchema]| list[TypeSchema],
+    status_code=HTTPStatus.OK
 )
-async def list_pokemon_type(
-    _: Annotated[User, Depends(get_current_user)],
-    service: Annotated[PokemonTypeService, Depends(get_pokemon_type_service)],
-    page_filter: Annotated[FilterPage, Depends(get_pokemon_type_filter)] = None,
+async def list_all(
+        service: Service,
+        current_user: CurrentUser,
+        page_filter: Annotated[FilterPage, Depends(get_type_filter)] = None,
 ):
-    return await service.list_all_cached(page_filter=page_filter)
+    return await service.list_all_cached(
+        page_filter=page_filter,
+        user_request=current_user.username,
+    )
 
 
 @router.get(
-    "/{identifier}", response_model=PokemonTypeSchema, status_code=HTTPStatus.OK
+    '/{param}',
+    response_model=TypeSchema,
+    status_code=HTTPStatus.OK
 )
-async def get_pokemon_type(
-    identifier: str,
-    _: Annotated[User, Depends(get_current_user)],
-    service: Annotated[PokemonTypeService, Depends(get_pokemon_type_service)],
-):
-    return await service.find_one_cached(param=identifier)
+async def find_one(param: str, service: Service, current_user: CurrentUser):
+    return await service.find_one_cached(
+        param=param,
+        user_request=current_user.username,
+    )
+

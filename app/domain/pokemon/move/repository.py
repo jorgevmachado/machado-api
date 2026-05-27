@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from app.core.repository.base import BaseRepository
-from app.models import PokemonMove
+from app.models.move import Move
 
 
-class PokemonMoveRepository(BaseRepository[PokemonMove]):
-    model = PokemonMove
-    default_order_by = "order"
+class MoveRepository(BaseRepository[Move]):
+    model = Move

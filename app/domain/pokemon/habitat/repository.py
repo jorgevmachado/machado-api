@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from app.core.repository.base import BaseRepository
-from app.models import PokemonHabitat
+from app.models.habitat import Habitat
 
 
-class PokemonHabitatRepository(BaseRepository[PokemonHabitat]):
-    model = PokemonHabitat
-    default_order_by = "order"
+class HabitatRepository(BaseRepository[Habitat]):
+    model = Habitat

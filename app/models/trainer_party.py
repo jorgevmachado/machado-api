@@ -11,17 +11,17 @@ from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
-    from app.models.my_pokemon import MyPokemon
+    from app.models.owned_pokemon import OwnedPokemon
     from app.models.trainer import Trainer
 
 
 @table_registry.mapped_as_dataclass
 class TrainerParty:
-    __tablename__ = "trainer_party"
+    __tablename__ = "trainer_parties"
 
     trainer_id: Mapped[UUID] = mapped_column(ForeignKey("trainers.id"), nullable=False)
     my_pokemon_id: Mapped[UUID] = mapped_column(
-        ForeignKey("my_pokemons.id"),
+        ForeignKey("owned_pokemons.id"),
         nullable=False,
     )
     slot: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -56,7 +56,7 @@ class TrainerParty:
         init=False,
         back_populates="party_slots",
     )
-    my_pokemon: Mapped["MyPokemon"] = relationship(
+    owned_pokemon: Mapped["OwnedPokemon"] = relationship(
         lazy=default_lazy,
         init=False,
         back_populates="party_slots",

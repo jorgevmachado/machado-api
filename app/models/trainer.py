@@ -11,12 +11,9 @@ from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
-    from app.models.battle_session import BattleSession
-    from app.models.exploration_event import ExplorationEvent
-    from app.models.healing_log import HealingLog
-    from app.models.my_pokemon import MyPokemon
+    from app.models.user import User
+    from app.models.owned_pokemon import OwnedPokemon
     from app.models.pokedex import Pokedex
-    from app.models.pokemon_center_healing import PokemonCenterHealing
     from app.models.trainer_encounter import TrainerEncounter
     from app.models.trainer_party import TrainerParty
 
@@ -44,7 +41,7 @@ class Trainer:
         DateTime(timezone=True), nullable=True, default=None, init=False
     )
 
-    my_pokemons: Mapped[list["MyPokemon"]] = relationship(
+    owned_pokemons: Mapped[list["OwnedPokemon"]] = relationship(
         lazy=default_lazy,
         default_factory=list,
         init=False,
@@ -72,31 +69,9 @@ class Trainer:
         repr=False,
         back_populates="trainer",
     )
-    exploration_events: Mapped[list["ExplorationEvent"]] = relationship(
-        lazy=default_lazy,
-        default_factory=list,
+
+    user: Mapped['User'] = relationship(
         init=False,
-        repr=False,
-        back_populates="trainer",
-    )
-    battle_sessions: Mapped[list["BattleSession"]] = relationship(
         lazy=default_lazy,
-        default_factory=list,
-        init=False,
-        repr=False,
-        back_populates="trainer",
-    )
-    pokemon_center_healings: Mapped[list["PokemonCenterHealing"]] = relationship(
-        lazy=default_lazy,
-        default_factory=list,
-        init=False,
-        repr=False,
-        back_populates="trainer",
-    )
-    healing_logs: Mapped[list["HealingLog"]] = relationship(
-        lazy=default_lazy,
-        default_factory=list,
-        init=False,
-        repr=False,
-        back_populates="trainer",
+        back_populates='trainer',
     )

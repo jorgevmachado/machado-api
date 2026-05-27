@@ -11,7 +11,7 @@ from app.core.database.base import default_lazy, table_registry
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
-    from app.models.pokemon_encounter import PokemonEncounter
+    from app.models.encounter import Encounter
     from app.models.trainer import Trainer
 
 
@@ -21,7 +21,7 @@ class TrainerEncounter:
 
     trainer_id: Mapped[UUID] = mapped_column(ForeignKey("trainers.id"), nullable=False)
     pokemon_encounter_id: Mapped[UUID] = mapped_column(
-        ForeignKey("pokemon_encounters.id"),
+        ForeignKey("encounters.id"),
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -55,7 +55,7 @@ class TrainerEncounter:
         init=False,
         back_populates="known_encounters",
     )
-    pokemon_encounter: Mapped["PokemonEncounter"] = relationship(
+    pokemon_encounter: Mapped["Encounter"] = relationship(
         lazy=default_lazy,
         init=False,
         back_populates="trainer_encounters",

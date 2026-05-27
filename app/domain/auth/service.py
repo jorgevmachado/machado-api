@@ -14,7 +14,6 @@ from app.domain.auth.schema import (
     RegisterSchema,
 )
 from app.domain.auth.repository import UserRepository
-from app.domain.trainer.service import TrainerService
 from app.models.enums import StatusEnum
 from app.models.user import User
 
@@ -24,12 +23,9 @@ logger = logging.getLogger(__name__)
 class AuthService:
     def __init__(
         self,
-        repository: UserRepository,
-        trainer_service: TrainerService | None = None,
+        repository: UserRepository
     ) -> None:
         self.repository = repository
-        session = repository.session
-        self.trainer_service = trainer_service or TrainerService.from_session(session)
 
     async def register(self, data: RegisterSchema) -> User:
         try:
@@ -94,8 +90,6 @@ class AuthService:
             )
 
     async def me(self, current_user: User) -> AuthResponseSchema:
-        trainer = await self.trainer_service.get_by_user_id(current_user.id)
-
         return AuthResponseSchema(
             id=current_user.id,
             name=current_user.name,
@@ -116,5 +110,5 @@ class AuthService:
             last_authentication_at=getattr(
                 current_user, "last_authentication_at", None
             ),
-            trainer=trainer,
+            trainer=None,
         )

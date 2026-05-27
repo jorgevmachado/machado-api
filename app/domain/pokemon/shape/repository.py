@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from app.core.repository.base import BaseRepository
-from app.models import PokemonShape
+from app.models.shape import Shape
 
 
-class PokemonShapeRepository(BaseRepository[PokemonShape]):
-    model = PokemonShape
-    default_order_by = "order"
+class ShapeRepository(BaseRepository[Shape]):
+    model = Shape

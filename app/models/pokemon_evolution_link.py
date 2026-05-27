@@ -10,7 +10,7 @@ from app.core.database.base import table_registry
 
 @table_registry.mapped_as_dataclass
 class PokemonEvolutionLink:
-    __tablename__ = "pokemon_evolution_links"
+    __tablename__ = "pokemon_evolution_link"
 
     pokemon_id: Mapped[UUID] = mapped_column(
         ForeignKey("pokemons.id", ondelete="CASCADE"), primary_key=True

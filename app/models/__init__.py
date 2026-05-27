@@ -1,80 +1,59 @@
-from app.models.battle_log import BattleLog
-from app.models.battle_session import BattleSession
-from app.models.battle_turn import BattleTurn
-from app.models.enums import (
-    BattleActionTypeEnum,
-    BattleActorEnum,
-    BattleCaptureOutcomeEnum,
-    BattleLogTypeEnum,
-    BattleSessionStatusEnum,
-    ExplorationEventTypeEnum,
-)
-from app.models.enums import GenderEnum, PokemonStatusEnum, RoleEnum, StatusEnum
-from app.models.exploration_event import ExplorationEvent
-from app.models.healing_log import HealingLog
-from app.models.my_pokemon import MyPokemon
-from app.models.my_pokemon_move import MyPokemonMove
-from app.models.pokedex import Pokedex
-from app.models.pokemon_center_healing import PokemonCenterHealing
-from app.models.pokemon import Pokemon
-from app.models.pokemon_ability import PokemonAbility
+from app.models.enums import GenderEnum, StatusEnum, RoleEnum, PokemonStatusEnum
+from app.models.user import User
+from app.models.ability import Ability
+from app.models.encounter import Encounter
+from app.models.growth_rate import GrowthRate
+from app.models.habitat import Habitat
+from app.models.image import Image
+from app.models.move import Move
+from app.models.shape import Shape
+
 from app.models.pokemon_ability_link import PokemonAbilityLink
-from app.models.pokemon_encounter import PokemonEncounter
 from app.models.pokemon_encounter_link import PokemonEncounterLink
-from app.models.pokemon_growth_rate import PokemonGrowthRate
-from app.models.pokemon_habitat import PokemonHabitat
-from app.models.pokemon_image import PokemonImage
-from app.models.pokemon_move import PokemonMove
-from app.models.pokemon_move_link import PokemonMoveLink
 from app.models.pokemon_evolution_link import PokemonEvolutionLink
-from app.models.pokemon_shape import PokemonShape
-from app.models.pokemon_type import PokemonType
-from app.models.pokemon_type_weakness import PokemonTypeWeakness
-from app.models.pokemon_type_strength import PokemonTypeStrength
+from app.models.pokemon_move_link import PokemonMoveLink
 from app.models.pokemon_type_link import PokemonTypeLink
+from app.models.type_strength_link import TypeStrengthLink
+from app.models.type_weakness_link import TypeWeaknessLink
+
+from app.models.type import Type
+from app.models.pokemon import Pokemon
+
 from app.models.trainer import Trainer
+from app.models.pokedex import Pokedex
+from app.models.pokedex_entry import PokedexEntry
+from app.models.owned_pokemon import OwnedPokemon
+from app.models.owned_pokemon_move import OwnedPokemonMove
 from app.models.trainer_encounter import TrainerEncounter
 from app.models.trainer_party import TrainerParty
-from app.models.user import User
 
 __all__ = [
-    "BattleLog",
-    "BattleSession",
-    "BattleTurn",
-    "BattleActionTypeEnum",
-    "BattleActorEnum",
-    "BattleCaptureOutcomeEnum",
-    "BattleLogTypeEnum",
-    "BattleSessionStatusEnum",
-    "ExplorationEvent",
-    "HealingLog",
-    "ExplorationEventTypeEnum",
-    "GenderEnum",
-    "MyPokemon",
-    "MyPokemonMove",
-    "Pokedex",
-    "PokemonCenterHealing",
-    "Pokemon",
-    "PokemonAbility",
+    "User",
+    "Ability",
+    "Encounter",
+    "GrowthRate",
+    "Habitat",
+    "Image",
+    "Move",
+    "Shape",
     "PokemonAbilityLink",
-    "PokemonEncounter",
     "PokemonEncounterLink",
-    "PokemonGrowthRate",
-    "PokemonHabitat",
-    "PokemonImage",
-    "PokemonMove",
-    "PokemonMoveLink",
     "PokemonEvolutionLink",
-    "PokemonShape",
-    "PokemonStatusEnum",
-    "PokemonType",
-    "PokemonTypeWeakness",
-    "PokemonTypeStrength",
+    "PokemonMoveLink",
     "PokemonTypeLink",
-    "RoleEnum",
-    "StatusEnum",
+    "TypeStrengthLink",
+    "TypeWeaknessLink",
+    "Type",
+    "Pokemon",
     "Trainer",
+    "Pokedex",
+    "PokedexEntry",
+    "OwnedPokemon",
+    "OwnedPokemonMove",
     "TrainerEncounter",
     "TrainerParty",
-    "User",
+    "RoleEnum",
+    "GenderEnum",
+    "StatusEnum",
+    "PokemonStatusEnum",
 ]
