@@ -11,6 +11,7 @@ from jwt import DecodeError, ExpiredSignatureError, decode, encode
 from pwdlib import PasswordHash
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
 from app.core.settings import Settings
@@ -52,7 +53,6 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
         payload = decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         subject: str | None = payload.get("sub")
@@ -64,13 +64,14 @@ async def get_current_user(
 
     except (DecodeError, ExpiredSignatureError, ValueError):
         raise credentials_exception
-
-    user = await session.scalar(select(User).where(User.id == user_id))
+    query = select(User).options(selectinload(User.trainer)).where(User.id == user_id)
+    user = await session.scalar(query)
 
     if not user:
         raise credentials_exception
 
     return user
+
 
 async def get_current_trainer(
     session: AsyncSession = Depends(get_session),

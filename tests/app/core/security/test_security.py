@@ -83,5 +83,3 @@ async def test_get_current_trainer_raises_not_found_when_missing():
 
     assert exc_info.value.status_code == HTTPStatus.NOT_FOUND
     assert exc_info.value.detail == "Trainer not found"
-
-

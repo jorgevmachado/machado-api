@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
@@ -23,8 +24,17 @@ from app.main import app
 
 
 class FakeSession:
+    def __init__(self):
+        self.scalars_result = []
+        self.scalar_result = None
+        self.added = []
+        self.flushed = False
+
+    async def scalars(self, *args, **kwargs):
+        return SimpleNamespace(all=lambda: self.scalars_result)
+
     async def scalar(self, *args, **kwargs):
-        return None
+        return self.scalar_result
 
     async def execute(self, *args, **kwargs):
         return None
@@ -38,8 +48,11 @@ class FakeSession:
     async def refresh(self, *args, **kwargs):
         return None
 
-    def add(self, *args, **kwargs):
-        return None
+    def add(self, entity):
+        self.added.append(entity)
+
+    def add_all(self, entities):
+        self.added.extend(entities)
 
 
 class FakeRedis:

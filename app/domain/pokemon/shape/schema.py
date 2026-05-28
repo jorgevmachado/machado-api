@@ -11,4 +11,3 @@ class ShapeSchema(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
-

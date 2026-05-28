@@ -26,6 +26,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 def get_image_service(session: Session) -> ImageService:
     return ImageService(ImageRepository(session))
 
+
 Service = Annotated[ImageService, Depends(get_image_service)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
@@ -49,14 +50,14 @@ def get_image_filter(
 
 
 @router.get(
-    '',
-    response_model=CustomLimitOffsetPage[ImageSchema]| list[ImageSchema],
-    status_code=HTTPStatus.OK
+    "",
+    response_model=CustomLimitOffsetPage[ImageSchema] | list[ImageSchema],
+    status_code=HTTPStatus.OK,
 )
 async def list_all(
-        service: Service,
-        current_user: CurrentUser,
-        page_filter: Annotated[FilterPage, Depends(get_image_filter)] = None,
+    service: Service,
+    current_user: CurrentUser,
+    page_filter: Annotated[FilterPage, Depends(get_image_filter)] = None,
 ):
     return await service.list_all_cached(
         page_filter=page_filter,
@@ -64,14 +65,9 @@ async def list_all(
     )
 
 
-@router.get(
-    '/{param}',
-    response_model=ImageSchema,
-    status_code=HTTPStatus.OK
-)
+@router.get("/{param}", response_model=ImageSchema, status_code=HTTPStatus.OK)
 async def find_one(param: str, service: Service, current_user: CurrentUser):
     return await service.find_one_cached(
         param=param,
         user_request=current_user.username,
     )
-

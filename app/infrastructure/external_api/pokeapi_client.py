@@ -59,6 +59,10 @@ class PokeApiClient:
         payload = await self._get(f"pokemon?offset={offset}&limit={limit}")
         return PokemonExternalListSchema.model_validate(payload)
 
+    async def total_pokemon(self) -> int:
+        payload = await self._get("pokemon?limit=0")
+        return payload["count"]
+
     async def get_pokemon(self, name_or_id: str | int) -> PokemonExternalSchema:
         payload = await self._get(f"pokemon/{name_or_id}")
         return PokemonExternalSchema.model_validate(payload)

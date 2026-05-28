@@ -26,7 +26,9 @@ class Trainer:
     pokeballs: Mapped[int] = mapped_column(Integer, nullable=False)
     capture_rate: Mapped[int] = mapped_column(Integer, nullable=False)
     base_capture_rate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    capture_progress_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    capture_progress_points: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True, default_factory=uuid4, init=False
@@ -70,8 +72,8 @@ class Trainer:
         back_populates="trainer",
     )
 
-    user: Mapped['User'] = relationship(
+    user: Mapped["User"] = relationship(
         init=False,
         lazy=default_lazy,
-        back_populates='trainer',
+        back_populates="trainer",
     )

@@ -1,3 +1,4 @@
+from app.models.common import utcnow
 from app.models.enums import GenderEnum, StatusEnum, RoleEnum, PokemonStatusEnum
 from app.models.user import User
 from app.models.ability import Ability
@@ -28,6 +29,7 @@ from app.models.trainer_encounter import TrainerEncounter
 from app.models.trainer_party import TrainerParty
 
 __all__ = [
+    "utcnow",
     "User",
     "Ability",
     "Encounter",

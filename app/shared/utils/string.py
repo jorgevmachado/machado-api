@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Any, cast
 
@@ -27,6 +28,10 @@ def _normalize_entry(entry: Any) -> dict:
     if isinstance(entry, dict):
         return entry
     return dict(entry)
+
+
+def text_strip(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def get_text_language(
@@ -70,7 +75,7 @@ def get_text_language(
     subtext: str | None = cast(str, subtext_raw) if subtext_raw else None
 
     return TextLanguageSchema(
-        text=text,
-        subtext=subtext,
+        text=text_strip(text),
+        subtext=text_strip(subtext) if subtext else None,
         language=language,
     )

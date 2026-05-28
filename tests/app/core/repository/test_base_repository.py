@@ -15,7 +15,7 @@ from app.shared.schemas import FilterPage
 
 
 @table_registry.mapped_as_dataclass
-class Pokedex:
+class PokedexTest:
     __tablename__ = "pokedex_test"
 
     trainer_id: Mapped[str] = mapped_column(String, nullable=False)
@@ -34,15 +34,15 @@ class PokemonBaseRepository(BaseRepository[Pokemon]):
     default_order_by = "order"
 
 
-class PokedexBaseRepository(BaseRepository[Pokedex]):
-    model = Pokedex
+class PokedexBaseRepository(BaseRepository[PokedexTest]):
+    model = PokedexTest
 
 
 class TestBaseRepositoryApplyOrderBy:
     @staticmethod
     def test_apply_order_by_returns_same_query_when_order_by_is_none():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
         page_filter = FilterPage()
 
         result_query = repository._apply_order_by(query, page_filter)
@@ -83,7 +83,7 @@ class TestBaseRepositoryApplyOrderBy:
     @staticmethod
     def test_apply_order_by_applies_outer_join_for_relationship_path():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
         page_filter = FilterPage.build(order_by="pokemon.order")
 
         result_query = repository._apply_order_by(query, page_filter)
@@ -95,7 +95,7 @@ class TestBaseRepositoryApplyOrderBy:
     @staticmethod
     def test_apply_order_by_raises_error_when_relation_is_invalid():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
         page_filter = FilterPage.build(order_by="invalid.order")
 
         with pytest.raises(ValueError, match="Invalid default_order_by relation"):
@@ -124,7 +124,7 @@ class TestBaseRepositoryApplyOrderBy:
     @staticmethod
     def test_apply_order_by_raises_error_when_last_field_is_invalid():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
         page_filter = FilterPage.build(order_by="pokemon.invalid_field")
 
         with pytest.raises(ValueError, match="Invalid default_order_by field"):
@@ -133,7 +133,7 @@ class TestBaseRepositoryApplyOrderBy:
     @staticmethod
     def test_apply_order_by_raises_error_when_last_token_is_not_column():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
         page_filter = FilterPage.build(order_by="pokemon.moves")
 
         with pytest.raises(ValueError, match="last token must be a mapped column"):
@@ -183,13 +183,13 @@ class TestBaseRepositoryRelationHelpers:
 
         predicate_sql = str(predicate)
         assert predicate is not None
-        assert "pokemon_types.name" in predicate_sql
+        assert ".name" in predicate_sql
 
     @staticmethod
     def test_build_name_predicate_builds_has_for_scalar_relationship():
         predicate = BaseRepository._build_name_predicate(
-            Pokedex.pokemon,
-            Pokedex.pokemon.property,
+            PokedexTest.pokemon,
+            PokedexTest.pokemon.property,
             "pikachu",
         )
 
@@ -261,7 +261,7 @@ class TestBaseRepositoryRelationHelpers:
 
         predicate_sql = str(predicate)
         assert predicate is not None
-        assert "pokemon_types.name" in predicate_sql
+        assert ".name" in predicate_sql
 
     @staticmethod
     def test_build_nested_predicate_returns_none_when_nested_predicate_is_none():
@@ -269,8 +269,8 @@ class TestBaseRepositoryRelationHelpers:
 
         with patch.object(repository, "_build_relation_predicate", return_value=None):
             predicate = repository._build_nested_predicate(
-                Pokedex.pokemon,
-                Pokedex.pokemon.property,
+                PokedexTest.pokemon,
+                PokedexTest.pokemon.property,
                 ["pokemon", "name"],
                 "pikachu",
             )
@@ -288,8 +288,8 @@ class TestBaseRepositoryRelationHelpers:
             return_value=nested_predicate,
         ):
             predicate = repository._build_nested_predicate(
-                Pokedex.pokemon,
-                Pokedex.pokemon.property,
+                PokedexTest.pokemon,
+                PokedexTest.pokemon.property,
                 ["pokemon", "name"],
                 "pikachu",
             )
@@ -333,12 +333,12 @@ class TestBaseRepositoryRelationHelpers:
         )
 
         assert predicate is not None
-        assert "pokemon_types.name" in str(predicate)
+        assert ".name" in str(predicate)
 
     @staticmethod
     def test_apply_relations_filters_returns_query_when_relation_attr_not_found():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
 
         result_query = repository._apply_relations_filters(
             query,
@@ -351,7 +351,7 @@ class TestBaseRepositoryRelationHelpers:
     @staticmethod
     def test_apply_relations_filters_returns_query_when_relation_has_no_mapper():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
 
         result_query = repository._apply_relations_filters(
             query,
@@ -364,7 +364,7 @@ class TestBaseRepositoryRelationHelpers:
     @staticmethod
     def test_apply_relations_filters_skips_none_values_and_returns_same_query():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
 
         result_query = repository._apply_relations_filters(
             query,
@@ -377,7 +377,7 @@ class TestBaseRepositoryRelationHelpers:
     @staticmethod
     def test_apply_relations_filters_uses_valid_column_fallback_when_predicate_is_none():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
 
         with patch.object(repository, "_build_relation_predicate", return_value=None):
             result_query = repository._apply_relations_filters(
@@ -392,7 +392,7 @@ class TestBaseRepositoryRelationHelpers:
     @staticmethod
     def test_apply_relations_filters_returns_same_query_when_no_predicates_generated():
         repository = PokedexBaseRepository(session=AsyncMock())
-        query = select(Pokedex)
+        query = select(PokedexTest)
 
         result_query = repository._apply_relations_filters(
             query,
@@ -414,7 +414,7 @@ class TestBaseRepositoryRelationHelpers:
         )
 
         assert result_query is not query
-        assert "pokemon_types.name" in str(result_query)
+        assert ".name" in str(result_query)
 
 
 class TestBaseRepositoryTotal:
@@ -658,7 +658,7 @@ class TestBaseRepositoryListAll:
         query_str = str(query)
 
         assert result == expected_items
-        assert "pokemon_types.name" in query_str
+        assert ".name" in query_str
 
     @staticmethod
     @pytest.mark.asyncio

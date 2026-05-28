@@ -231,3 +231,68 @@ class CacheService:
             message=f'{self.alias} all keys matching "{pattern}" successfully deleted from cache.',
         )
         return None
+
+    async def delete_cache(
+        self,
+        prefix: str | None = None,
+        without: list[str] | None = None,
+        cache_key: str | None = None,
+    ) -> None:
+        if cache_key:
+            await self.cache.delete_cache(cache_key)
+            log_service_success(
+                self.logger_params,
+                operation="cache_delete_cache",
+                message=f'{self.alias} key "{cache_key}" successfully deleted from cache.',
+            )
+            return None
+
+        if prefix is None:
+            prefix = self.prefix
+        pattern = f"{prefix}*"
+        protected_keys = {key for key in (without or []) if key}
+
+        if not protected_keys:
+            await self.cache.delete_pattern(pattern)
+            log_service_success(
+                self.logger_params,
+                operation="cache_delete_cache",
+                message=f'{self.alias} all keys matching "{pattern}" successfully deleted from cache.',
+            )
+            return None
+
+        deleted_count = 0
+        async for key in self.cache.redis_client.scan_iter(match=pattern):
+            if key in protected_keys:
+                continue
+
+            await self.cache.delete_cache(key)
+            deleted_count += 1
+
+        log_service_success(
+            self.logger_params,
+            operation="cache_delete_cache",
+            message=(
+                f'{self.alias} selective cache clear finished for "{pattern}": '
+                f"deleted={deleted_count}, protected={len(protected_keys)}."
+            ),
+        )
+        return None
+
+    async def get_cache(self, key: str) -> dict | None:
+        log_service_success(
+            self.logger_params,
+            operation="cache_get_cache",
+            message=f"Cache data for {self.alias} with key {key} retrieved.",
+        )
+        return await self.cache.get_cache(key)
+
+    async def set_cache(self, key: str, data: dict, ttl: Optional[int] = None) -> None:
+        cache_ttl = ttl or self.ttl
+        await self.cache.set_cache(key, data, cache_ttl)
+        log_service_success(
+            self.logger_params,
+            operation="cache_set_cache",
+            message=f"Cache data for {self.alias} with key {key} successfully set.",
+        )
+        return None

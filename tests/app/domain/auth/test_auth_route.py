@@ -59,22 +59,26 @@ class TestAuthRoutes:
     @staticmethod
     @pytest.mark.asyncio
     async def test_me_route_delegates_to_service():
+        user_id = uuid4()
         current_user = SimpleNamespace(
-            id=uuid4(),
+            id=user_id,
             name="Ash",
             email="ash@example.com",
             username="ash",
             role=RoleEnum.USER,
             status=StatusEnum.ACTIVE,
             gender=GenderEnum.MALE,
-            trainer=None,
+            trainer=SimpleNamespace(
+                id=uuid4(),
+                user_id=user_id,
+                pokeballs=1,
+                capture_rate=75,
+                base_capture_rate=75,
+                capture_progress_points=0,
+                created_at=datetime.now(timezone.utc),
+            ),
             created_at=datetime.now(timezone.utc),
         )
-        expected = SimpleNamespace(id=current_user.id)
-        service = AsyncMock()
-        service.me.return_value = expected
+        result = await me(current_user=current_user)
 
-        result = await me(current_user=current_user, service=service)
-
-        assert result is expected
-        service.me.assert_awaited_once_with(current_user)
+        assert result is current_user

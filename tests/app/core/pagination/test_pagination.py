@@ -116,6 +116,16 @@ class TestPaginationExceptionPagination:
         assert isinstance(result, list)
 
     @staticmethod
+    def test_exception_pagination_with_page_and_limit_without_offset():
+        """Should build paginated response when page is provided without explicit offset"""
+        result = exception_pagination(FilterPage(page=2, offset=None, limit=10))
+
+        assert hasattr(result, "items")
+        assert hasattr(result, "meta")
+        assert result.meta.limit == 10
+        assert result.meta.offset == 10
+
+    @staticmethod
     def test_exception_pagination_catch_exception():
         """Should catch exception and return empty list when LimitOffsetParams raises error"""
         with patch(

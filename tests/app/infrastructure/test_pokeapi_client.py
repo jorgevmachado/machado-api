@@ -173,3 +173,20 @@ async def test_pokeapi_client_encounters_returns_empty_for_non_list(monkeypatch)
     client._get = AsyncMock(return_value={"not": "list"})
 
     assert await client.get_pokemon_encounters(1) == []
+
+
+@pytest.mark.asyncio
+async def test_pokeapi_client_total_pokemons(monkeypatch):
+    monkeypatch.setattr(
+        "app.infrastructure.external_api.pokeapi_client.Settings",
+        lambda: SimpleNamespace(
+            POKEAPI_BASE_URL="https://pokeapi.co/api/v2",
+            POKEAPI_CA_BUNDLE=None,
+            POKEAPI_VERIFY_SSL=False,
+        ),
+    )
+    client = PokeApiClient(
+        base_url="https://pokeapi.co/api/v2/", verify=True, timeout=1
+    )
+    client._get = AsyncMock(return_value={"count": 10})
+    assert await client.total_pokemon() == 10

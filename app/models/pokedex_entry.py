@@ -28,7 +28,7 @@ class PokedexEntry:
     speed: Mapped[int] = mapped_column(Integer, nullable=False)
     pokedex_id: Mapped[UUID] = mapped_column(ForeignKey("pokedex.id"), nullable=False)
     pokemon_id: Mapped[UUID] = mapped_column(ForeignKey("pokemons.id"), nullable=False)
-    nickname: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    name: Mapped[str] = mapped_column(String, nullable=False, default=None)
     level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     experience: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     discovered: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

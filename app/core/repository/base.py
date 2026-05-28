@@ -366,7 +366,11 @@ class BaseRepository[ModelT]:
         if not filters and not has_special_filter:
             return None
 
-        ignored_filters = {k: v for k, v in original_kwargs.items() if k not in valid_columns and v is not None}
+        ignored_filters = {
+            k: v
+            for k, v in original_kwargs.items()
+            if k not in valid_columns and v is not None
+        }
         if ignored_filters:
             return None
 

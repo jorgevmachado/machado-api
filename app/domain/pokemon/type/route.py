@@ -26,6 +26,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 def get_type_service(session: Session) -> TypeService:
     return TypeService(TypeRepository(session))
 
+
 Service = Annotated[TypeService, Depends(get_type_service)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
@@ -49,29 +50,25 @@ def get_type_filter(
 
 
 @router.get(
-    '',
-    response_model=CustomLimitOffsetPage[TypeSchema]| list[TypeSchema],
-    status_code=HTTPStatus.OK
+    "",
+    response_model=CustomLimitOffsetPage[TypeSchema] | list[TypeSchema],
+    status_code=HTTPStatus.OK,
 )
 async def list_all(
-        service: Service,
-        current_user: CurrentUser,
-        page_filter: Annotated[FilterPage, Depends(get_type_filter)] = None,
+    service: Service,
+    current_user: CurrentUser,
+    page_filter: Annotated[FilterPage, Depends(get_type_filter)] = None,
 ):
+    print("HERE")
     return await service.list_all_cached(
         page_filter=page_filter,
         user_request=current_user.username,
     )
 
 
-@router.get(
-    '/{param}',
-    response_model=TypeSchema,
-    status_code=HTTPStatus.OK
-)
+@router.get("/{param}", response_model=TypeSchema, status_code=HTTPStatus.OK)
 async def find_one(param: str, service: Service, current_user: CurrentUser):
-    return await service.find_one_cached(
+    return await service.find_one(
         param=param,
         user_request=current_user.username,
     )
-

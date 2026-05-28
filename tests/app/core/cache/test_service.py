@@ -350,3 +350,121 @@ class TestCacheServiceSetOne:
 
         assert result is None
         cache_service.cache.delete_pattern.assert_awaited_once_with("test_cache*")
+
+
+class TestCacheServiceDeleteCache:
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_delete_cache_by_key(cache_service):
+        cache_service.cache.delete_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.delete_cache(cache_key="test_cache:item:1")
+
+        assert result is None
+        cache_service.cache.delete_cache.assert_awaited_once_with("test_cache:item:1")
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_delete_cache_by_prefix_without_exclusions(cache_service):
+        cache_service.cache.delete_pattern = AsyncMock(return_value=None)
+
+        result = await cache_service.delete_cache(prefix="test_cache")
+
+        assert result is None
+        cache_service.cache.delete_pattern.assert_awaited_once_with("test_cache*")
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_delete_cache_uses_self_prefix_when_prefix_is_none(cache_service):
+        cache_service.cache.delete_pattern = AsyncMock(return_value=None)
+
+        result = await cache_service.delete_cache()
+
+        assert result is None
+        cache_service.cache.delete_pattern.assert_awaited_once_with(
+            f"{cache_service.prefix}*"
+        )
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_delete_cache_with_without_preserves_protected_keys(cache_service):
+        protected_key = "test_cache:item:protected"
+        deletable_key = "test_cache:item:deletable"
+
+        async def mock_scan_iter(match):
+            for key in [protected_key, deletable_key]:
+                yield key
+
+        cache_service.cache.redis_client.scan_iter = mock_scan_iter
+        cache_service.cache.delete_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.delete_cache(
+            prefix="test_cache",
+            without=[protected_key],
+        )
+
+        assert result is None
+        cache_service.cache.delete_cache.assert_awaited_once_with(deletable_key)
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_delete_cache_with_without_all_protected(cache_service):
+        key1 = "test_cache:item:1"
+        key2 = "test_cache:item:2"
+
+        async def mock_scan_iter(match):
+            for key in [key1, key2]:
+                yield key
+
+        cache_service.cache.redis_client.scan_iter = mock_scan_iter
+        cache_service.cache.delete_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.delete_cache(
+            prefix="test_cache",
+            without=[key1, key2],
+        )
+
+        assert result is None
+        cache_service.cache.delete_cache.assert_not_awaited()
+
+
+class TestCacheServiceRawCache:
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_get_cache_delegates_to_cache_manager(cache_service):
+        key = "test_cache:raw:key"
+        expected = {"value": 1}
+        cache_service.cache.get_cache = AsyncMock(return_value=expected)
+
+        result = await cache_service.get_cache(key)
+
+        assert result == expected
+        cache_service.cache.get_cache.assert_awaited_once_with(key)
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_set_cache_delegates_to_cache_manager_with_default_ttl(cache_service):
+        key = "test_cache:raw:key"
+        payload = {"value": 1}
+        cache_service.cache.set_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.set_cache(key, payload)
+
+        assert result is None
+        cache_service.cache.set_cache.assert_awaited_once_with(
+            key,
+            payload,
+            cache_service.ttl,
+        )
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_set_cache_delegates_to_cache_manager_with_custom_ttl(cache_service):
+        key = "test_cache:raw:key"
+        payload = {"value": 1}
+        cache_service.cache.set_cache = AsyncMock(return_value=None)
+
+        result = await cache_service.set_cache(key, payload, ttl=30)
+
+        assert result is None
+        cache_service.cache.set_cache.assert_awaited_once_with(key, payload, 30)

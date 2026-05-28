@@ -46,8 +46,5 @@ async def login(
 
 
 @router.get("/me", response_model=AuthResponseSchema, status_code=HTTPStatus.OK)
-async def me(
-    current_user: Annotated[User, Depends(get_current_user)],
-    service: Annotated[AuthService, Depends(get_auth_service)],
-):
-    return await service.me(current_user)
+async def me(current_user: Annotated[User, Depends(get_current_user)]):
+    return current_user

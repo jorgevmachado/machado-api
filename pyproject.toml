@@ -21,7 +21,8 @@ dependencies = [
     "fastapi-pagination (>=0.15.12,<0.16.0)",
     "redis (>=7.4.0,<8.0.0)",
     "pydantic (>=2.13.2,<3.0.0)",
-    "httpx (>=0.28.1,<0.29.0)"
+    "httpx (>=0.28.1,<0.29.0)",
+    "datetime (>=6.0,<7.0)"
 ]
 
 

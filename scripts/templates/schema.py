@@ -11,4 +11,3 @@ class __CLASS_NAME__Schema(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
-

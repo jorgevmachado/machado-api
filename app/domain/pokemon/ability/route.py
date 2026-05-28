@@ -26,6 +26,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 def get_ability_service(session: Session) -> AbilityService:
     return AbilityService(AbilityRepository(session))
 
+
 Service = Annotated[AbilityService, Depends(get_ability_service)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
@@ -49,14 +50,14 @@ def get_ability_filter(
 
 
 @router.get(
-    '',
-    response_model=CustomLimitOffsetPage[AbilitySchema]| list[AbilitySchema],
-    status_code=HTTPStatus.OK
+    "",
+    response_model=CustomLimitOffsetPage[AbilitySchema] | list[AbilitySchema],
+    status_code=HTTPStatus.OK,
 )
 async def list_all(
-        service: Service,
-        current_user: CurrentUser,
-        page_filter: Annotated[FilterPage, Depends(get_ability_filter)] = None,
+    service: Service,
+    current_user: CurrentUser,
+    page_filter: Annotated[FilterPage, Depends(get_ability_filter)] = None,
 ):
     return await service.list_all_cached(
         page_filter=page_filter,
@@ -64,14 +65,15 @@ async def list_all(
     )
 
 
-@router.get(
-    '/{param}',
-    response_model=AbilitySchema,
-    status_code=HTTPStatus.OK
-)
-async def find_one(param: str, service: Service, current_user: CurrentUser):
+@router.get("/{param}", response_model=AbilitySchema, status_code=HTTPStatus.OK)
+async def find_one(
+    param: str,
+    service: Service,
+    current_user: CurrentUser,
+    clean_cache: bool = False,
+):
     return await service.find_one_cached(
         param=param,
+        clean_cache=clean_cache,
         user_request=current_user.username,
     )
-

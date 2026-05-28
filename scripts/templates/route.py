@@ -26,6 +26,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 def get___DOMAIN_ENTITY___service(session: Session) -> __CLASS_NAME__Service:
     return __CLASS_NAME__Service(__CLASS_NAME__Repository(session))
 
+
 Service = Annotated[__CLASS_NAME__Service, Depends(get___DOMAIN_ENTITY___service)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
@@ -49,14 +50,15 @@ def get___DOMAIN_ENTITY___filter(
 
 
 @router.get(
-    '',
-    response_model=CustomLimitOffsetPage[__CLASS_NAME__Schema]| list[__CLASS_NAME__Schema],
-    status_code=HTTPStatus.OK
+    "",
+    response_model=CustomLimitOffsetPage[__CLASS_NAME__Schema]
+    | list[__CLASS_NAME__Schema],
+    status_code=HTTPStatus.OK,
 )
 async def list_all(
-        service: Service,
-        current_user: CurrentUser,
-        page_filter: Annotated[FilterPage, Depends(get___DOMAIN_ENTITY___filter)] = None,
+    service: Service,
+    current_user: CurrentUser,
+    page_filter: Annotated[FilterPage, Depends(get___DOMAIN_ENTITY___filter)] = None,
 ):
     return await service.list_all_cached(
         page_filter=page_filter,
@@ -64,14 +66,9 @@ async def list_all(
     )
 
 
-@router.get(
-    '/{param}',
-    response_model=__CLASS_NAME__Schema,
-    status_code=HTTPStatus.OK
-)
+@router.get("/{param}", response_model=__CLASS_NAME__Schema, status_code=HTTPStatus.OK)
 async def find_one(param: str, service: Service, current_user: CurrentUser):
     return await service.find_one_cached(
         param=param,
         user_request=current_user.username,
     )
-

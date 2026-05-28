@@ -7,13 +7,12 @@ from fastapi import HTTPException
 
 from app.core.exceptions import handle_service_exception
 from app.core.security import create_access_token, get_password_hash, verify_password
+from app.domain.auth.repository import UserRepository
 from app.domain.auth.schema import (
-    AuthResponseSchema,
     LoginResponseSchema,
     LoginSchema,
     RegisterSchema,
 )
-from app.domain.auth.repository import UserRepository
 from app.models.enums import StatusEnum
 from app.models.user import User
 
@@ -21,10 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def __init__(
-        self,
-        repository: UserRepository
-    ) -> None:
+    def __init__(self, repository: UserRepository) -> None:
         self.repository = repository
 
     async def register(self, data: RegisterSchema) -> User:
@@ -88,27 +84,3 @@ class AuthService:
                 operation="login",
                 raise_exception=True,
             )
-
-    async def me(self, current_user: User) -> AuthResponseSchema:
-        return AuthResponseSchema(
-            id=current_user.id,
-            name=current_user.name,
-            email=current_user.email,
-            status=current_user.status,
-            role=current_user.role,
-            username=current_user.username,
-            created_at=current_user.created_at,
-            updated_at=getattr(current_user, "updated_at", None),
-            deleted_at=getattr(current_user, "deleted_at", None),
-            total_authentications=getattr(current_user, "total_authentications", None),
-            authentication_success=getattr(
-                current_user, "authentication_success", None
-            ),
-            authentication_failures=getattr(
-                current_user, "authentication_failures", None
-            ),
-            last_authentication_at=getattr(
-                current_user, "last_authentication_at", None
-            ),
-            trainer=None,
-        )

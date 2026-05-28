@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -29,3 +30,13 @@ class PokemonRepository(BaseRepository[Pokemon]):
 
     def __init__(self, session: AsyncSession):
         super().__init__(session)
+
+    async def list_by_names(self, names: set[str]) -> list[Pokemon]:
+        if not names:
+            return []
+        query = select(Pokemon).where(Pokemon.name.in_(names))
+        result = await self.session.scalars(query)
+        list_pokemon: list[Pokemon] = []
+        for pokemon in result.all():
+            list_pokemon.append(pokemon)
+        return list_pokemon

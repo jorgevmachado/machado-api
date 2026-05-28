@@ -213,6 +213,26 @@ class TestBaseServiceFindOneCached:
                 assert result.name == item.name
                 assert result.value == item.value
 
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_base_service_find_one_cached_with_clean_cache(base_service):
+        item = BaseModelSchema(id="1", name="item1", value=1)
+        cache_key = "test_service:item1"
+        base_service.cache_service.build_key_one = MagicMock(return_value=cache_key)
+        base_service.cache_service.cache.delete_cache = AsyncMock(return_value=None)
+        base_service.cache_service.get_one = AsyncMock(return_value=item)
+
+        result = await base_service.find_one_cached(
+            param=item.name,
+            user_request="user1",
+            clean_cache=True,
+        )
+
+        assert result == item
+        base_service.cache_service.cache.delete_cache.assert_awaited_once_with(
+            cache_key
+        )
+
 
 class TestBaseServiceFindBy:
     @staticmethod
@@ -341,7 +361,9 @@ class TestBaseServiceListAllCachedNoPageFilter:
         base_service.cache_service.set_list = AsyncMock()
         base_service.list_all = AsyncMock(return_value=values)
 
-        result = await base_service.list_all_cached(page_filter=None, user_request="user3")
+        result = await base_service.list_all_cached(
+            page_filter=None, user_request="user3"
+        )
         assert isinstance(result, list)
         assert len(result) == len(values)
         base_service.cache_service.set_list.assert_awaited_once()
@@ -373,7 +395,9 @@ class TestBaseServiceInvalidateCache:
         base_service.cache_service.delete_domain = AsyncMock()
         base_service.cache_service.cache.delete_cache = AsyncMock()
 
-        await base_service._invalidate_cache(identifier="item1", trainer_id="trainer123")
+        await base_service._invalidate_cache(
+            identifier="item1", trainer_id="trainer123"
+        )
 
         base_service.cache_service.delete_domain.assert_awaited_once()
         base_service.cache_service.cache.delete_cache.assert_awaited_once_with(
@@ -410,7 +434,9 @@ class TestBaseServiceFindOneByName:
         entity = BaseModelSchema(id="123", name="test_name", value=100)
         mock_repository.find_by.return_value = entity
         with patch("app.core.service.base.log_service_success") as mock_log_success:
-            result = await base_service.find_one(param="test_name", user_request="user1")
+            result = await base_service.find_one(
+                param="test_name", user_request="user1"
+            )
             assert result == entity
             mock_repository.find_by.assert_awaited_once_with(name="test_name")
             mock_log_success.assert_called_once()
@@ -436,7 +462,9 @@ class TestBaseServiceFindOneCache:
     @pytest.mark.asyncio
     async def test_find_one_cached_with_trainer_id(base_service):
         entity = BaseModelSchema(id="1", name="item", value=50)
-        base_service.cache_service.build_key_one = AsyncMock(return_value="trainer123:item")
+        base_service.cache_service.build_key_one = AsyncMock(
+            return_value="trainer123:item"
+        )
         base_service.cache_service.get_one = AsyncMock(return_value=None)
         base_service.cache_service.set_one = AsyncMock()
         base_service.find_one = AsyncMock(return_value=entity)

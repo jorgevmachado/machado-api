@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import HTTPException, Query
 from pydantic import BaseModel
@@ -42,11 +42,9 @@ class BaseService[
         self,
         page_filter: Annotated[FilterPage, Query()] = None,
         user_request: str | None = None,
-        trainer_id: str | None = None,
     ):
         try:
-            filter_page = FilterPage.build(page_filter, trainer_id=trainer_id)
-            return await self.repository.list_all(page_filter=filter_page)
+            return await self.repository.list_all(page_filter=page_filter)
         except Exception as exception:
             handle_service_exception(
                 exception,
@@ -69,21 +67,18 @@ class BaseService[
         self,
         page_filter: Annotated[FilterPage, Query()] = None,
         user_request: str | None = None,
-        trainer_id: str | None = None,
+        **kwargs,
     ):
-        filter_page = FilterPage.build(page_filter, trainer_id=trainer_id)
         clean_cache = page_filter.clean_cache if page_filter else False
         if clean_cache:
             await self.cache_service.delete_domain()
         if page_filter:
             page_filter.clean_cache = None
-        key = self.cache_service.build_key_list(page_filter=filter_page)
+        key = self.cache_service.build_key_list(page_filter=page_filter)
         cached = await self.cache_service.get_list(key)
         if cached:
             return cached
-        result = await self.list_all(
-            page_filter=page_filter, user_request=user_request, trainer_id=trainer_id
-        )
+        result = await self.list_all(page_filter=page_filter, user_request=user_request)
 
         await self.cache_service.set_list(key, result)
 
@@ -92,11 +87,15 @@ class BaseService[
     async def find_one(
         self,
         param: str,
-        user_request: str | None = None,
-        trainer_id: str | None = None,
+        **kwargs,
     ):
+        trainer_id = kwargs.get("trainer_id") if kwargs else None
+        user_request = kwargs.get("user_request") if kwargs else None
+        trainer_id = cast(str, trainer_id) if trainer_id else None
         try:
-            find_by_filters: dict[str, str] = {'trainer_id': trainer_id} if trainer_id else {}
+            find_by_filters: dict[str, str] = (
+                {"trainer_id": trainer_id} if trainer_id else {}
+            )
             if is_valid_uuid(param):
                 result = await self.repository.find_by(id=param, **find_by_filters)
             else:
@@ -126,9 +125,7 @@ class BaseService[
             )
 
     async def _invalidate_cache(
-            self,
-            identifier: str | None = None,
-            trainer_id: str | None = None
+        self, identifier: str | None = None, trainer_id: str | None = None
     ) -> None:
         await self.cache_service.delete_domain()
         if identifier:
@@ -140,17 +137,22 @@ class BaseService[
     async def find_one_cached(
         self,
         param: str,
-        user_request: str | None = None,
-        trainer_id: str | None = None,
+        **kwargs,
     ):
         cache_key = param
+        trainer_id = kwargs.get("trainer_id") if kwargs else None
+        trainer_id = cast(str, trainer_id) if trainer_id else None
         if trainer_id:
             cache_key = f"{trainer_id}:{param}"
         key = self.cache_service.build_key_one(param=cache_key)
+        clean_cache = kwargs.get("clean_cache") if kwargs else False
+
+        if clean_cache:
+            await self.cache_service.cache.delete_cache(key)
         cached = await self.cache_service.get_one(key)
         if cached:
             return cached
-        item = await self.find_one(param, user_request, trainer_id)
+        item = await self.find_one(param, **kwargs)
         await self.cache_service.set_one(key, item)
         return item
 
@@ -187,7 +189,7 @@ class BaseService[
         user_request: str | None = None,
     ) -> ModelT:
         try:
-            entity = await self.find_one(param, user_request)
+            entity = await self.find_one(param, user_request=user_request)
             if entity is None:
                 raise HTTPException(
                     status_code=HTTPStatus.NOT_FOUND,
