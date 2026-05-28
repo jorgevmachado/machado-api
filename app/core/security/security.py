@@ -15,7 +15,13 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
 from app.core.settings import Settings
-from app.models import Trainer
+from app.models import (
+    Pokedex,
+    PokedexEntry,
+    Pokemon,
+    Trainer,
+    Type,
+)
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", refreshUrl="auth/refresh")
@@ -64,7 +70,47 @@ async def get_current_user(
 
     except (DecodeError, ExpiredSignatureError, ValueError):
         raise credentials_exception
-    query = select(User).options(selectinload(User.trainer)).where(User.id == user_id)
+
+    trainer_relations = selectinload(User.trainer)
+    pokedex_pokemon_relations = (
+        trainer_relations.selectinload(Trainer.pokedex)
+        .selectinload(Pokedex.entries)
+        .selectinload(PokedexEntry.pokemon)
+    )
+
+    query = (
+        select(User)
+        .options(
+            trainer_relations.selectinload(Trainer.user),
+            trainer_relations.selectinload(Trainer.pokedex),
+            pokedex_pokemon_relations.selectinload(Pokemon.images),
+            pokedex_pokemon_relations.selectinload(Pokemon.habitat),
+            pokedex_pokemon_relations.selectinload(Pokemon.shape),
+            pokedex_pokemon_relations.selectinload(Pokemon.growth_rate),
+            pokedex_pokemon_relations.selectinload(Pokemon.types).selectinload(
+                Type.strengths
+            ),
+            pokedex_pokemon_relations.selectinload(Pokemon.types).selectinload(
+                Type.weaknesses
+            ),
+            pokedex_pokemon_relations.selectinload(Pokemon.moves),
+            pokedex_pokemon_relations.selectinload(Pokemon.abilities),
+            pokedex_pokemon_relations.selectinload(Pokemon.encounters),
+            pokedex_pokemon_relations.selectinload(Pokemon.evolutions).selectinload(
+                Pokemon.images
+            ),
+            pokedex_pokemon_relations.selectinload(Pokemon.evolutions).selectinload(
+                Pokemon.habitat
+            ),
+            pokedex_pokemon_relations.selectinload(Pokemon.evolutions).selectinload(
+                Pokemon.shape
+            ),
+            pokedex_pokemon_relations.selectinload(Pokemon.evolutions).selectinload(
+                Pokemon.growth_rate
+            ),
+        )
+        .where(User.id == user_id)
+    )
     user = await session.scalar(query)
 
     if not user:

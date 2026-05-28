@@ -14,6 +14,7 @@ from app.domain.trainer.encounter.schema import (
     TrainerEncounterSchema,
 )
 from app.models import Encounter, TrainerEncounter
+from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
 
@@ -73,4 +74,27 @@ class TrainerEncounterService(
                 trainer_id=trainer_id,
                 pokemon_encounter_id=encounter.id,
             )
+        )
+
+    async def get_or_create_list(
+        self,
+        trainer_id: UUID,
+        known_encounters: list[TrainerEncounter] | None = None,
+        encounters: list[Encounter] | None = None,
+    ) -> list[TrainerEncounter]:
+        if known_encounters and len(known_encounters) > 0:
+            return known_encounters
+
+        exist_know_encounters = await self.list_all(
+            page_filter=FilterPage.build(trainer_id=trainer_id)
+        )
+
+        if exist_know_encounters:
+            return exist_know_encounters
+
+        if not encounters:
+            return []
+
+        return await self.sync_from_resources(
+            trainer_id=trainer_id, encounters=encounters
         )

@@ -20,7 +20,7 @@ class TrainerParty:
     __tablename__ = "trainer_parties"
 
     trainer_id: Mapped[UUID] = mapped_column(ForeignKey("trainers.id"), nullable=False)
-    my_pokemon_id: Mapped[UUID] = mapped_column(
+    owned_pokemon_id: Mapped[UUID] = mapped_column(
         ForeignKey("owned_pokemons.id"),
         nullable=False,
     )

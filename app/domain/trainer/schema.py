@@ -3,6 +3,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.trainer.encounter.schema import TrainerEncounterSchema
+from app.domain.trainer.owned_pokemon.schema import OwnedPokemonSchema
+from app.domain.trainer.party.schema import TrainerPartySchema
+from app.domain.trainer.pokedex.schema import PokedexSchema
+
 
 class UserTrainerSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -17,13 +22,36 @@ class TrainerSchema(BaseModel):
 
     id: UUID
     user: UserTrainerSchema
+    pokedex: PokedexSchema | None = None
     pokeballs: int
     capture_rate: int
+    party_slots: list[TrainerPartySchema] = []
+    owned_pokemons: list[OwnedPokemonSchema] = []
+    known_encounters: list[TrainerEncounterSchema] = []
     base_capture_rate: int
     capture_progress_points: int
     created_at: datetime
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
+
+    @staticmethod
+    def _serialize_collection(
+        serialized: dict,
+        key: str,
+        schema: type[BaseModel],
+        *,
+        use_serialize: bool = False,
+    ) -> None:
+        values = serialized.get(key)
+        if not values:
+            return
+
+        serialized[key] = [
+            schema.model_validate(value).serialize()
+            if use_serialize
+            else schema.model_validate(value).model_dump(mode="json")
+            for value in values
+        ]
 
 
 class OnboardPayloadSchema(BaseModel):

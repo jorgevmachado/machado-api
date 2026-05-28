@@ -18,6 +18,7 @@ from app.domain.trainer.service import TrainerService
 from app.domain.trainer.encounter.route import router as trainer_encounter_router
 from app.domain.trainer.owned_pokemon.route import router as owned_pokemon_router
 from app.domain.trainer.pokedex.route import router as pokedex_router
+from app.domain.trainer.party.route import router as trainer_party_router
 
 router = APIRouter(prefix="/trainer", tags=["trainer"])
 router.include_router(
@@ -25,6 +26,7 @@ router.include_router(
 )
 router.include_router(owned_pokemon_router, prefix="/pokemon", tags=["OwnedPokemon"])
 router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
+router.include_router(trainer_party_router, prefix="/party", tags=["TrainerParty"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 

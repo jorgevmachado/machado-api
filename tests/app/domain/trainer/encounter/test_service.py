@@ -23,7 +23,9 @@ async def test_sync_from_resources_marks_first_order_as_active() -> None:
     second = SimpleNamespace(id=uuid4(), order=2)
     service.get_or_create = AsyncMock(side_effect=["first", "second"])
 
-    result = await service.sync_from_resources(trainer_id=trainer_id, encounters=[second, first])
+    result = await service.sync_from_resources(
+        trainer_id=trainer_id, encounters=[second, first]
+    )
 
     assert result == ["first", "second"]
     assert service.get_or_create.await_args_list[0].kwargs["is_active"] is False
@@ -63,3 +65,70 @@ async def test_get_or_create_saves_when_entity_does_not_exist() -> None:
 
     assert result is created
     repository.save.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_list_returns_known_encounters_when_provided() -> None:
+    known_encounters = [SimpleNamespace(id=uuid4())]
+    service = TrainerEncounterService(repository=AsyncMock())
+
+    result = await service.get_or_create_list(
+        trainer_id=uuid4(),
+        known_encounters=known_encounters,
+        encounters=[SimpleNamespace(id=uuid4(), order=1)],
+    )
+
+    assert result is known_encounters
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_list_returns_existing_encounters_from_list_all() -> None:
+    existing = [SimpleNamespace(id=uuid4())]
+    service = TrainerEncounterService(repository=AsyncMock())
+    service.list_all = AsyncMock(return_value=existing)
+
+    result = await service.get_or_create_list(
+        trainer_id=uuid4(),
+        known_encounters=None,
+        encounters=[SimpleNamespace(id=uuid4(), order=1)],
+    )
+
+    assert result is existing
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_list_returns_empty_when_encounters_are_missing() -> None:
+    service = TrainerEncounterService(repository=AsyncMock())
+    service.list_all = AsyncMock(return_value=[])
+    service.sync_from_resources = AsyncMock()
+
+    result = await service.get_or_create_list(
+        trainer_id=uuid4(),
+        known_encounters=None,
+        encounters=None,
+    )
+
+    assert result == []
+    service.sync_from_resources.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_list_syncs_when_no_known_or_existing_encounters() -> None:
+    expected = [SimpleNamespace(id=uuid4())]
+    encounters = [SimpleNamespace(id=uuid4(), order=1)]
+    trainer_id = uuid4()
+    service = TrainerEncounterService(repository=AsyncMock())
+    service.list_all = AsyncMock(return_value=[])
+    service.sync_from_resources = AsyncMock(return_value=expected)
+
+    result = await service.get_or_create_list(
+        trainer_id=trainer_id,
+        known_encounters=[],
+        encounters=encounters,
+    )
+
+    assert result is expected
+    service.sync_from_resources.assert_awaited_once_with(
+        trainer_id=trainer_id,
+        encounters=encounters,
+    )

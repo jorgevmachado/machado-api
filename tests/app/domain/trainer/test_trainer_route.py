@@ -22,7 +22,9 @@ async def test_onboarding_delegates_to_service(current_user: SimpleNamespace) ->
     expected = SimpleNamespace(id="trainer-id")
     service.onboard.return_value = expected
 
-    result = await onboarding(payload=payload, service=service, current_user=current_user)
+    result = await onboarding(
+        payload=payload, service=service, current_user=current_user
+    )
 
     assert result is expected
     service.onboard.assert_awaited_once_with(current_user=current_user, payload=payload)

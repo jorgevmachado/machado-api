@@ -45,8 +45,8 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         self,
         pokedex_id: UUID,
         resources: list[Pokemon],
-        discovered_at: datetime,
-        discovered_pokemon: Pokemon,
+        discovered_at: datetime | None = None,
+        discovered_pokemon: Pokemon | None = None,
     ) -> list[PokedexEntry]:
         sync: list[PokedexEntry] = []
         for resource in resources:
@@ -64,8 +64,8 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         self,
         pokedex_id: UUID,
         pokemon: Pokemon,
-        discovered_at: datetime,
-        discovered_pokemon: Pokemon,
+        discovered_at: datetime | None = None,
+        discovered_pokemon: Pokemon | None = None,
     ) -> PokedexEntry:
         entity = await self.repository.find_by(
             pokedex_id=pokedex_id, pokemon_id=pokemon.id
@@ -73,7 +73,8 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         if entity:
             return entity
         attributes = build_initial_attributes(pokemon)
-        discovered = discovered_pokemon.id == pokemon.id
+        discovered_pokemon_id = discovered_pokemon.id if discovered_pokemon else None
+        discovered = discovered_pokemon_id == pokemon.id
         return await self.repository.save(
             entity=PokedexEntry(
                 name=pokemon.name,

@@ -28,12 +28,16 @@ def test_get_pokedex_filter_builds_filter() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_all_cached_delegates_to_service(current_trainer: SimpleNamespace) -> None:
+async def test_list_all_cached_delegates_to_service(
+    current_trainer: SimpleNamespace,
+) -> None:
     service = AsyncMock()
     service.list_all_cached.return_value = SimpleNamespace(items=[])
     page_filter = get_pokedex_filter(page=1, limit=10)
 
-    await list_all_cached(service=service, current_trainer=current_trainer, page_filter=page_filter)
+    await list_all_cached(
+        service=service, current_trainer=current_trainer, page_filter=page_filter
+    )
 
     args = service.list_all_cached.await_args.kwargs
     assert args["page_filter"].trainer_id == current_trainer.id
@@ -46,7 +50,9 @@ async def test_find_one_delegates_to_service(current_trainer: SimpleNamespace) -
     expected = SimpleNamespace(id="entry")
     service.find_one_cached.return_value = expected
 
-    result = await find_one(param="entry", service=service, current_trainer=current_trainer)
+    result = await find_one(
+        param="entry", service=service, current_trainer=current_trainer
+    )
 
     assert result is expected
     service.find_one_cached.assert_awaited_once_with(

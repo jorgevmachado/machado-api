@@ -20,7 +20,9 @@ def test_get_trainer_encounter_service_builds_service() -> None:
 
 
 def test_get_encounter_filter_builds_filter() -> None:
-    page_filter = get_encounter_filter(page=1, offset=1, limit=10, name="kanto", order=1)
+    page_filter = get_encounter_filter(
+        page=1, offset=1, limit=10, name="kanto", order=1
+    )
     assert page_filter.page == 1
     assert page_filter.offset == 1
     assert page_filter.limit == 10
@@ -33,7 +35,9 @@ async def test_list_all_delegates_to_service(current_trainer: SimpleNamespace) -
     service.list_all_cached.return_value = SimpleNamespace(items=[])
     page_filter = get_encounter_filter(page=1, limit=12)
 
-    await list_all(service=service, current_trainer=current_trainer, page_filter=page_filter)
+    await list_all(
+        service=service, current_trainer=current_trainer, page_filter=page_filter
+    )
 
     args = service.list_all_cached.await_args.kwargs
     assert args["page_filter"].trainer_id == current_trainer.id
@@ -46,7 +50,9 @@ async def test_find_one_delegates_to_service(current_trainer: SimpleNamespace) -
     expected = SimpleNamespace(id="encounter")
     service.find_one_cached.return_value = expected
 
-    result = await find_one(param="encounter", service=service, current_trainer=current_trainer)
+    result = await find_one(
+        param="encounter", service=service, current_trainer=current_trainer
+    )
 
     assert result is expected
     service.find_one_cached.assert_awaited_once_with(

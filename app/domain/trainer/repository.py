@@ -1,7 +1,15 @@
 from sqlalchemy.orm import selectinload
 
 from app.core.repository import BaseRepository
-from app.models import OwnedPokemon, Pokemon, Trainer, Type
+from app.models import (
+    OwnedPokemon,
+    Pokemon,
+    Trainer,
+    Type,
+    Pokedex,
+    PokedexEntry,
+    TrainerParty,
+)
 
 
 class TrainerRepository(BaseRepository[Trainer]):
@@ -30,4 +38,12 @@ class TrainerRepository(BaseRepository[Trainer]):
         selectinload(Trainer.owned_pokemons)
         .selectinload(OwnedPokemon.pokemon)
         .selectinload(Pokemon.encounters),
+        selectinload(Trainer.pokedex)
+        .selectinload(Pokedex.entries)
+        .selectinload(PokedexEntry.pokemon)
+        .selectinload(Pokemon.evolutions),
+        selectinload(Trainer.party_slots)
+        .selectinload(TrainerParty.owned_pokemon)
+        .selectinload(OwnedPokemon.pokemon)
+        .selectinload(Pokemon.evolutions),
     )

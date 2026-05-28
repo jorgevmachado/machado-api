@@ -154,7 +154,7 @@ def upgrade() -> None:
     op.create_table(
         "trainer_parties",
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
-        sa.Column("my_pokemon_id", sa.Uuid(), nullable=False),
+        sa.Column("owned_pokemon_id", sa.Uuid(), nullable=False),
         sa.Column("slot", sa.Integer(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -162,7 +162,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
-            ["my_pokemon_id"],
+            ["owned_pokemon_id"],
             ["owned_pokemons.id"],
         ),
         sa.ForeignKeyConstraint(

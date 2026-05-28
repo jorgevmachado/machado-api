@@ -50,12 +50,9 @@ class Trainer:
         repr=False,
         back_populates="trainer",
     )
-    pokedex: Mapped[list["Pokedex"]] = relationship(
+    pokedex: Mapped["Pokedex"] = relationship(
         lazy=default_lazy,
-        default_factory=list,
         init=False,
-        repr=False,
-        back_populates="trainer",
     )
     known_encounters: Mapped[list["TrainerEncounter"]] = relationship(
         lazy=default_lazy,

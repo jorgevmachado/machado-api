@@ -38,7 +38,9 @@ async def test_get_or_create_returns_existing_entity() -> None:
     repository.find_by.return_value = existing
     service = OwnedPokemonMoveService(repository=repository)
 
-    result = await service.get_or_create(resource=SimpleNamespace(id=uuid4(), pp=10), owned_pokemon_id=uuid4())
+    result = await service.get_or_create(
+        resource=SimpleNamespace(id=uuid4(), pp=10), owned_pokemon_id=uuid4()
+    )
 
     assert result is existing
     repository.save.assert_not_awaited()

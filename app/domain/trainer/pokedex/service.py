@@ -56,10 +56,10 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
     async def create(
         self,
         trainer_id: UUID,
-        discovered_pokemon: Pokemon,
+        discovered_pokemon: Pokemon | None = None,
         discovered_at: datetime | None = None,
         commit: bool = True,
-    ):
+    ) -> Pokedex:
         try:
             pokedex = Pokedex(trainer_id=trainer_id)
             self.repository.session.add(pokedex)
@@ -154,4 +154,27 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
         )
         return await self.pokedex_entry_service.find_one_cached(
             param=param, pokedex_id=pokedex_id, user_request=kwargs.get("user_request")
+        )
+
+    async def get_or_create(
+        self,
+        trainer_id: UUID,
+        commit: bool = True,
+        discovered_at: datetime | None = None,
+        discovered_pokemon: Pokemon | None = None,
+        pokedex: Pokedex | None = None,
+    ) -> Pokedex:
+        if pokedex:
+            return pokedex
+
+        exist_pokedex = await self.find_by(trainer_id=trainer_id, without_throw=True)
+
+        if exist_pokedex:
+            return exist_pokedex
+
+        return await self.create(
+            commit=commit,
+            trainer_id=trainer_id,
+            discovered_at=discovered_at,
+            discovered_pokemon=discovered_pokemon,
         )

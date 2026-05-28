@@ -23,7 +23,9 @@ def test_select_initial_moves_samples_when_more_than_four(monkeypatch) -> None:
         "app.domain.trainer.owned_pokemon.move.business.random.sample",
         lambda values, amount: values[:amount],
     )
-    moves = [SimpleNamespace(name=f"move-{index}", deleted_at=None) for index in range(6)]
+    moves = [
+        SimpleNamespace(name=f"move-{index}", deleted_at=None) for index in range(6)
+    ]
 
     selected = select_initial_moves(moves)
 

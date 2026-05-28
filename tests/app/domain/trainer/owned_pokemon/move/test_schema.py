@@ -5,7 +5,9 @@ from app.domain.trainer.owned_pokemon.move.schema import OwnedPokemonMoveSchema
 
 def test_serialize_collection_keeps_empty_values_untouched() -> None:
     payload = {"moves": []}
-    OwnedPokemonMoveSchema._serialize_collection(payload, "moves", OwnedPokemonMoveSchema)
+    OwnedPokemonMoveSchema._serialize_collection(
+        payload, "moves", OwnedPokemonMoveSchema
+    )
     assert payload == {"moves": []}
 
 

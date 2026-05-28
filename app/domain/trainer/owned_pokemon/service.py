@@ -22,7 +22,7 @@ from app.domain.trainer.owned_pokemon.schema import (
     OwnedPokemonSchema,
 )
 from app.domain.trainer.progression import build_initial_attributes
-from app.models import OwnedPokemon, Pokemon
+from app.models import OwnedPokemon
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -59,11 +59,26 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
     async def create(
         self,
         trainer_id: UUID,
-        pokemon: Pokemon,
+        pokemon_name: str,
         nickname: str | None,
         commit: bool = True,
+        only_allowed_pokemon: list[str] | None = None,
     ) -> OwnedPokemon:
         try:
+            pokemon_name = pokemon_name.strip().lower()
+            if only_allowed_pokemon and pokemon_name not in only_allowed_pokemon:
+                raise HTTPException(
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    detail="Pokemon are not allowed",
+                )
+            pokemon = await self.pokemon_service.find_one(param=pokemon_name)
+
+            if not pokemon:
+                raise HTTPException(
+                    status_code=HTTPStatus.NOT_FOUND,
+                    detail="Pokemon not found",
+                )
+
             effective_nickname = resolve_effective_nickname(pokemon.name, nickname)
             existing_pokemons = await self.list_all(
                 page_filter=FilterPage.build(trainer_id=trainer_id)
@@ -114,3 +129,38 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
             if commit:
                 await self.repository.session.rollback()
             raise
+
+    async def get_or_create(
+        self,
+        trainer_id: UUID,
+        pokemon_name: str,
+        commit: bool = True,
+        nickname: str | None = None,
+        owned_pokemons: list[OwnedPokemon] | None = None,
+        only_allowed_pokemon: list[str] | None = None,
+    ) -> OwnedPokemon:
+        owned_pokemon = (
+            owned_pokemons[0] if owned_pokemons and len(owned_pokemons) > 0 else None
+        )
+
+        if owned_pokemon:
+            return owned_pokemon
+
+        exist_owned_pokemon = await self.pokemon_service.find_by(
+            trainer_id=trainer_id, pokemon_name=pokemon_name
+        )
+
+        if exist_owned_pokemon:
+            return exist_owned_pokemon
+
+        await self.pokemon_service.list_all_cached(
+            page_filter=FilterPage.build(page=1, limit=1)
+        )
+
+        return await self.create(
+            commit=commit,
+            nickname=nickname,
+            trainer_id=trainer_id,
+            pokemon_name=pokemon_name,
+            only_allowed_pokemon=only_allowed_pokemon,
+        )

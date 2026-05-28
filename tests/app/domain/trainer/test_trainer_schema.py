@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from app.domain.trainer.encounter.schema import TrainerEncounterSchema
+from app.domain.trainer.schema import TrainerSchema
 
 
 def test_serialize_collection_keeps_empty_values_untouched() -> None:
     payload = {"items": []}
-    TrainerEncounterSchema._serialize_collection(
-        payload, "items", TrainerEncounterSchema
-    )
+    TrainerSchema._serialize_collection(payload, "items", TrainerSchema)
     assert payload == {"items": []}
 
 
@@ -28,7 +26,7 @@ def test_serialize_collection_serializes_values_with_model_dump() -> None:
             return _Validated(value)
 
     payload = {"items": [1, 2]}
-    TrainerEncounterSchema._serialize_collection(payload, "items", DummyModel)
+    TrainerSchema._serialize_collection(payload, "items", DummyModel)
 
     assert payload["items"] == [{"value": 1}, {"value": 2}]
 
@@ -50,7 +48,7 @@ def test_serialize_collection_serializes_values_with_serialize_flag() -> None:
             return _Validated(value)
 
     payload = {"items": [1]}
-    TrainerEncounterSchema._serialize_collection(
+    TrainerSchema._serialize_collection(
         payload,
         "items",
         DummyModel,

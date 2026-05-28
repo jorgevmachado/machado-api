@@ -24,11 +24,17 @@ def test_from_session_builds_service() -> None:
     assert isinstance(service, PokedexService)
 
 
-def test_init_builds_default_dependencies_from_session(trainer_session: AsyncMock) -> None:
+def test_init_builds_default_dependencies_from_session(
+    trainer_session: AsyncMock,
+) -> None:
     repository = _build_repository(trainer_session)
     with (
-        patch("app.domain.trainer.pokedex.service.PokemonService.from_session") as pokemon_from_session,
-        patch("app.domain.trainer.pokedex.service.PokedexEntryService.from_session") as entry_from_session,
+        patch(
+            "app.domain.trainer.pokedex.service.PokemonService.from_session"
+        ) as pokemon_from_session,
+        patch(
+            "app.domain.trainer.pokedex.service.PokedexEntryService.from_session"
+        ) as entry_from_session,
     ):
         pokemon_from_session.return_value = AsyncMock()
         entry_from_session.return_value = AsyncMock()
@@ -38,11 +44,15 @@ def test_init_builds_default_dependencies_from_session(trainer_session: AsyncMoc
 
 
 @pytest.mark.asyncio
-async def test_create_returns_fresh_pokedex_and_commits(trainer_session: AsyncMock) -> None:
+async def test_create_returns_fresh_pokedex_and_commits(
+    trainer_session: AsyncMock,
+) -> None:
     repository = _build_repository(trainer_session)
     repository.find_by.return_value = SimpleNamespace(id=uuid4())
     pokemon_service = AsyncMock()
-    pokemon_service.list_all.return_value = [SimpleNamespace(id=uuid4(), name="bulbasaur")]
+    pokemon_service.list_all.return_value = [
+        SimpleNamespace(id=uuid4(), name="bulbasaur")
+    ]
     pokedex_entry_service = AsyncMock()
     service = PokedexService(
         repository=repository,
@@ -116,7 +126,9 @@ async def test_create_rolls_back_and_raises_when_fresh_not_found(
 
 
 @pytest.mark.asyncio
-async def test_get_by_raises_when_trainer_id_missing(trainer_session: AsyncMock) -> None:
+async def test_get_by_raises_when_trainer_id_missing(
+    trainer_session: AsyncMock,
+) -> None:
     service = PokedexService(
         repository=_build_repository(trainer_session),
         pokemon_service=AsyncMock(),
@@ -128,7 +140,9 @@ async def test_get_by_raises_when_trainer_id_missing(trainer_session: AsyncMock)
 
 
 @pytest.mark.asyncio
-async def test_get_by_returns_cached_id_and_cleans_cache(trainer_session: AsyncMock) -> None:
+async def test_get_by_returns_cached_id_and_cleans_cache(
+    trainer_session: AsyncMock,
+) -> None:
     service = PokedexService(
         repository=_build_repository(trainer_session),
         pokemon_service=AsyncMock(),
@@ -145,7 +159,9 @@ async def test_get_by_returns_cached_id_and_cleans_cache(trainer_session: AsyncM
 
 
 @pytest.mark.asyncio
-async def test_get_by_loads_from_repository_and_sets_cache(trainer_session: AsyncMock) -> None:
+async def test_get_by_loads_from_repository_and_sets_cache(
+    trainer_session: AsyncMock,
+) -> None:
     repository = _build_repository(trainer_session)
     repository.find_by.return_value = SimpleNamespace(id=uuid4())
     service = PokedexService(
@@ -198,7 +214,12 @@ async def test_list_all_cached_delegates_to_pokedex_entry_service(
     result = await service.list_all_cached(page_filter=page_filter, user_request="ash")
 
     assert result is pokedex_entry_service.list_all_cached.return_value
-    assert pokedex_entry_service.list_all_cached.await_args.kwargs["page_filter"].pokedex_id == "pokedex-id"
+    assert (
+        pokedex_entry_service.list_all_cached.await_args.kwargs[
+            "page_filter"
+        ].pokedex_id
+        == "pokedex-id"
+    )
 
 
 @pytest.mark.asyncio
@@ -227,3 +248,62 @@ async def test_find_one_cached_delegates_to_pokedex_entry_service(
         pokedex_id="pokedex-id",
         user_request="ash",
     )
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_returns_given_pokedex_without_querying() -> None:
+    pokedex = SimpleNamespace(id=uuid4())
+    service = PokedexService(
+        repository=_build_repository(AsyncMock()),
+        pokemon_service=AsyncMock(),
+        pokedex_entry_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock()
+    service.create = AsyncMock()
+
+    result = await service.get_or_create(trainer_id=uuid4(), pokedex=pokedex)
+
+    assert result is pokedex
+    service.find_by.assert_not_awaited()
+    service.create.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_returns_existing_pokedex_when_found() -> None:
+    existing = SimpleNamespace(id=uuid4())
+    service = PokedexService(
+        repository=_build_repository(AsyncMock()),
+        pokemon_service=AsyncMock(),
+        pokedex_entry_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock(return_value=existing)
+    service.create = AsyncMock()
+
+    result = await service.get_or_create(trainer_id=uuid4())
+
+    assert result is existing
+    service.create.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_creates_when_pokedex_does_not_exist() -> None:
+    created = SimpleNamespace(id=uuid4())
+    discovered_pokemon = SimpleNamespace(id=uuid4())
+    trainer_id = uuid4()
+    service = PokedexService(
+        repository=_build_repository(AsyncMock()),
+        pokemon_service=AsyncMock(),
+        pokedex_entry_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock(return_value=None)
+    service.create = AsyncMock(return_value=created)
+
+    result = await service.get_or_create(
+        trainer_id=trainer_id,
+        commit=False,
+        discovered_at=datetime.now(tz=timezone.utc),
+        discovered_pokemon=discovered_pokemon,
+    )
+
+    assert result is created
+    service.create.assert_awaited_once()

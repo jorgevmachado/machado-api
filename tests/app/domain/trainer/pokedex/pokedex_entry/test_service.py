@@ -110,7 +110,9 @@ async def test_find_one_cached_builds_cache_key_with_pokedex_id() -> None:
 
 
 @pytest.mark.asyncio
-async def test_find_one_cached_returns_cached_value_without_querying_repository() -> None:
+async def test_find_one_cached_returns_cached_value_without_querying_repository() -> (
+    None
+):
     repository = AsyncMock()
     service = PokedexEntryService(repository=repository)
     cached = SimpleNamespace(id=uuid4())

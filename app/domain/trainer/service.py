@@ -1,27 +1,32 @@
 from __future__ import annotations
-import logging
 
+import logging
 from http import HTTPStatus
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import handle_service_exception
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
 from app.domain.pokemon.service import PokemonService
 from app.domain.trainer.business import (
-    STARTER_POKEMON_NAMES,
     DEFAULT_TRAINER_CAPTURE_RATE,
     DEFAULT_TRAINER_POKEBALLS,
+    STARTER_POKEMON_NAMES,
 )
 from app.domain.trainer.encounter.service import TrainerEncounterService
 from app.domain.trainer.owned_pokemon.service import OwnedPokemonService
+from app.domain.trainer.party.service import TrainerPartyService
 from app.domain.trainer.pokedex.service import PokedexService
-
-from app.models import Trainer, User, RoleEnum
-
 from app.domain.trainer.repository import TrainerRepository
-from app.domain.trainer.schema import TrainerSchema, OnboardPayloadSchema
+from app.domain.trainer.schema import OnboardPayloadSchema, TrainerSchema
+from app.models import (
+    RoleEnum,
+    Trainer,
+    User,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         pokemon_service: PokemonService | None = None,
         pokedex_service: PokedexService | None = None,
         trainer_encounter_service: TrainerEncounterService | None = None,
+        trainer_party_service: TrainerPartyService | None = None,
     ) -> None:
         super().__init__(
             alias="Trainer",
@@ -50,6 +56,9 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         )
         self.pokemon_service = pokemon_service or PokemonService.from_session(session)
         self.pokedex_service = pokedex_service or PokedexService.from_session(session)
+        self.trainer_party_service = (
+            trainer_party_service or TrainerPartyService.from_session(session)
+        )
         self.trainer_encounter_service = (
             trainer_encounter_service or TrainerEncounterService.from_session(session)
         )
@@ -62,71 +71,62 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         self, current_user: User, payload: OnboardPayloadSchema
     ) -> Trainer | None:
         try:
-            if current_user.trainer:
-                raise HTTPException(
-                    status_code=HTTPStatus.BAD_REQUEST,
-                    detail="Trainer already onboarded",
-                )
             is_admin = current_user.role == RoleEnum.ADMIN
-            pokemon_name = payload.pokemon_name.strip().lower()
-
-            if not is_admin and pokemon_name not in STARTER_POKEMON_NAMES:
+            trainer = await self.get_or_create(
+                user_id=current_user.id,
+                is_admin=is_admin,
+                trainer=current_user.trainer,
+                payload=payload,
+            )
+            if not trainer:
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
-                    detail="Starter Pokemon is not allowed",
+                    detail="Cannot onboard trainer, try again later!",
                 )
-            pokeballs = DEFAULT_TRAINER_POKEBALLS
-            capture_rate = DEFAULT_TRAINER_CAPTURE_RATE
-            if is_admin:
-                pokeballs = payload.pokeballs or DEFAULT_TRAINER_POKEBALLS
-                capture_rate = payload.capture_rate or DEFAULT_TRAINER_POKEBALLS
 
-            trainer = await self.repository.save(
-                entity=Trainer(
-                    user_id=current_user.id,
-                    pokeballs=pokeballs,
-                    capture_rate=capture_rate,
-                    base_capture_rate=DEFAULT_TRAINER_CAPTURE_RATE,
-                    capture_progress_points=0,
-                )
+            owned_pokemon = await self.owned_pokemon_service.get_or_create(
+                commit=False,
+                nickname=payload.nickname,
+                trainer_id=trainer.id,
+                owned_pokemons=trainer.owned_pokemons,
+                pokemon_name=payload.pokemon_name,
+                only_allowed_pokemon=None if is_admin else STARTER_POKEMON_NAMES,
             )
-            if trainer:
-                pokemon = await self.pokemon_service.find_one(pokemon_name)
-                if pokemon:
-                    owned_pokemon = await self.owned_pokemon_service.create(
-                        commit=False,
-                        pokemon=pokemon,
-                        nickname=payload.nickname,
-                        trainer_id=trainer.id,
-                    )
 
-                    await self.pokedex_service.create(
-                        commit=False,
-                        trainer_id=trainer.id,
-                        discovered_at=owned_pokemon.captured_at,
-                        discovered_pokemon=owned_pokemon.pokemon,
-                    )
+            await self.pokedex_service.get_or_create(
+                commit=False,
+                pokedex=trainer.pokedex,
+                trainer_id=trainer.id,
+                discovered_at=owned_pokemon.captured_at,
+                discovered_pokemon=owned_pokemon.pokemon,
+            )
 
-                    await self.trainer_encounter_service.sync_from_resources(
-                        trainer_id=trainer.id,
-                        encounters=owned_pokemon.pokemon.encounters,
-                    )
-                    await self.repository.session.commit()
-                    await self.repository.session.refresh(trainer)
+            await self.trainer_encounter_service.get_or_create_list(
+                trainer_id=trainer.id,
+                encounters=owned_pokemon.pokemon.encounters,
+                known_encounters=trainer.known_encounters,
+            )
 
-                    fresh = await self.repository.find_by(id=trainer.id)
+            await self.trainer_party_service.get_or_create_list(
+                trainer_id=trainer.id,
+                party_slots=trainer.party_slots,
+                owned_pokemon=owned_pokemon,
+            )
 
-                    if fresh is None:
-                        raise HTTPException(
-                            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-                            detail="Could not load created Trainer",
-                        )
+            await self.repository.session.commit()
+            await self.repository.session.refresh(trainer)
 
-                    await self.cache_service.delete_domain()
+            fresh = await self.repository.find_by(id=trainer.id)
 
-                    return fresh
+            if fresh is None:
+                raise HTTPException(
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                    detail="Could not load created Trainer",
+                )
+            await self.cache_service.delete_domain()
 
-            return trainer
+            return fresh
+
         except Exception as exception:
             await self.repository.session.rollback()
             handle_service_exception(
@@ -136,3 +136,29 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 operation="onboard",
                 raise_exception=True,
             )
+
+    async def get_or_create(
+        self,
+        user_id: UUID,
+        is_admin: bool,
+        payload: OnboardPayloadSchema,
+        trainer: Trainer | None = None,
+    ) -> Trainer:
+        if trainer:
+            return await self.find_by(id=trainer.id, user_id=user_id)
+
+        pokeballs = DEFAULT_TRAINER_POKEBALLS
+        capture_rate = DEFAULT_TRAINER_CAPTURE_RATE
+        if is_admin:
+            pokeballs = payload.pokeballs or DEFAULT_TRAINER_POKEBALLS
+            capture_rate = payload.capture_rate or DEFAULT_TRAINER_POKEBALLS
+
+        return await self.repository.save(
+            entity=Trainer(
+                user_id=user_id,
+                pokeballs=pokeballs,
+                capture_rate=capture_rate,
+                base_capture_rate=DEFAULT_TRAINER_CAPTURE_RATE,
+                capture_progress_points=0,
+            )
+        )

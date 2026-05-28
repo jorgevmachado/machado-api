@@ -6,7 +6,9 @@ from app.domain.trainer.progression.business import build_initial_attributes
 
 
 def test_build_initial_attributes_rolls_expected_stats(monkeypatch) -> None:
-    monkeypatch.setattr("app.domain.trainer.progression.business.random.uniform", lambda *_: 1.0)
+    monkeypatch.setattr(
+        "app.domain.trainer.progression.business.random.uniform", lambda *_: 1.0
+    )
     pokemon = SimpleNamespace(
         attack=49,
         defense=49,
@@ -32,7 +34,9 @@ def test_build_initial_attributes_rolls_expected_stats(monkeypatch) -> None:
 
 
 def test_build_initial_attributes_applies_minimums(monkeypatch) -> None:
-    monkeypatch.setattr("app.domain.trainer.progression.business.random.uniform", lambda *_: 0.0)
+    monkeypatch.setattr(
+        "app.domain.trainer.progression.business.random.uniform", lambda *_: 0.0
+    )
     pokemon = SimpleNamespace(
         attack=0,
         defense=None,

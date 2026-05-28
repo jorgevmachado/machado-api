@@ -10,6 +10,7 @@ class GenderEnum(str, Enum):
 class StatusEnum(str, Enum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
+    INCOMPLETE = "INCOMPLETE"
 
 
 class RoleEnum(str, Enum):
