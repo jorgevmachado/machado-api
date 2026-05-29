@@ -17,7 +17,7 @@ def _build_repository(session: AsyncMock) -> AsyncMock:
     return repository
 
 
-def _build_pokemon(name: str = "bulbasaur") -> SimpleNamespace:
+def _build_pokemon(name: str = "bulbasaur", capture_rate: int = 45) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         name=name,
@@ -28,6 +28,7 @@ def _build_pokemon(name: str = "bulbasaur") -> SimpleNamespace:
         special_attack=65,
         special_defense=65,
         speed=45,
+        capture_rate=capture_rate,
     )
 
 
@@ -57,6 +58,8 @@ async def test_create_returns_fresh_entity_and_commits(
         trainer_id=uuid4(),
         pokemon_name="bulbasaur",
         nickname=None,
+        pokedex_hp=None,
+        pokedex_max_hp=None,
         commit=True,
     )
 
@@ -88,6 +91,8 @@ async def test_create_without_commit_skips_commit_refresh_and_cache(
         trainer_id=uuid4(),
         pokemon_name="bulbasaur",
         nickname="  Bulba  ",
+        pokedex_hp=None,
+        pokedex_max_hp=None,
         commit=False,
     )
 
@@ -116,6 +121,8 @@ async def test_create_raises_when_fresh_entity_is_missing(
             trainer_id=uuid4(),
             pokemon_name="bulbasaur",
             nickname=None,
+            pokedex_hp=None,
+            pokedex_max_hp=None,
             commit=True,
         )
 
@@ -138,6 +145,8 @@ async def test_create_raises_when_pokemon_is_not_allowed(
             trainer_id=uuid4(),
             pokemon_name=" Bulbasaur ",
             nickname=None,
+            pokedex_hp=None,
+            pokedex_max_hp=None,
             commit=True,
             only_allowed_pokemon=["pikachu"],
         )
@@ -164,6 +173,8 @@ async def test_create_raises_when_base_pokemon_does_not_exist(
             trainer_id=uuid4(),
             pokemon_name="bulbasaur",
             nickname=None,
+            pokedex_hp=None,
+            pokedex_max_hp=None,
             commit=True,
         )
 
@@ -190,6 +201,8 @@ async def test_create_rolls_back_when_commit_enabled_and_exception_occurs(
             trainer_id=uuid4(),
             pokemon_name="bulbasaur",
             nickname=None,
+            pokedex_hp=None,
+            pokedex_max_hp=None,
             commit=True,
         )
 
@@ -216,6 +229,8 @@ async def test_create_does_not_rollback_when_commit_disabled_and_exception_occur
             trainer_id=uuid4(),
             pokemon_name="bulbasaur",
             nickname=None,
+            pokedex_hp=None,
+            pokedex_max_hp=None,
             commit=False,
         )
 
@@ -292,6 +307,67 @@ async def test_get_or_create_creates_when_existing_owned_pokemon_is_missing() ->
         pokemon_name="bulbasaur",
         only_allowed_pokemon=["bulbasaur"],
     )
+
+
+@pytest.mark.asyncio
+async def test_create_passes_trainer_capture_rate_to_validate(
+    trainer_session: AsyncMock,
+) -> None:
+    repository = _build_repository(trainer_session)
+    repository.find_by.return_value = SimpleNamespace(id=uuid4(), name="bulbasaur")
+    pokemon_service = AsyncMock()
+    pokemon_service.find_one = AsyncMock(return_value=_build_pokemon())
+    service = OwnedPokemonService(
+        repository=repository,
+        pokemon_service=pokemon_service,
+        owned_pokemon_move_service=AsyncMock(),
+    )
+    service.list_all = AsyncMock(return_value=set())
+    service.cache_service.delete_domain = AsyncMock()
+
+    with patch(
+        "app.domain.trainer.owned_pokemon.service.validate_capture_rate"
+    ) as mock_validate:
+        await service.create(
+            trainer_id=uuid4(),
+            pokemon_name="bulbasaur",
+            nickname=None,
+            pokedex_hp=40,
+            pokedex_max_hp=100,
+            trainer_capture_rate=200,
+            commit=True,
+        )
+        mock_validate.assert_called_once()
+        call_kwargs = mock_validate.call_args.kwargs
+        assert call_kwargs["pokedex_hp"] == 40
+        assert call_kwargs["pokedex_max_hp"] == 100
+        assert call_kwargs["trainer_capture_rate"] == 200
+
+
+@pytest.mark.asyncio
+async def test_create_raises_when_capture_rate_validation_fails(
+    trainer_session: AsyncMock,
+) -> None:
+    repository = _build_repository(trainer_session)
+    pokemon_service = AsyncMock()
+    pokemon_service.find_one = AsyncMock(return_value=_build_pokemon(capture_rate=200))
+    service = OwnedPokemonService(
+        repository=repository,
+        pokemon_service=pokemon_service,
+        owned_pokemon_move_service=AsyncMock(),
+    )
+    service.list_all = AsyncMock(return_value=set())
+
+    with pytest.raises(Exception):
+        await service.create(
+            trainer_id=uuid4(),
+            pokemon_name="bulbasaur",
+            nickname=None,
+            pokedex_hp=100,
+            pokedex_max_hp=100,
+            trainer_capture_rate=50,
+            commit=True,
+        )
 
 
 def test_init_builds_default_dependencies_from_session(

@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.core.security import get_current_user
 
-from app.domain.trainer.schema import OnboardPayloadSchema, TrainerSchema
+from app.domain.trainer.schema import (
+    OnboardPayloadSchema,
+    TrainerSchema,
+    CapturePayloadSchema,
+)
 
 from app.models import User
 
@@ -46,3 +50,11 @@ async def onboarding(
     payload: OnboardPayloadSchema, service: Service, current_user: CurrentUser
 ):
     return await service.onboard(current_user=current_user, payload=payload)
+
+@router.post(
+    "/capture", response_model=TrainerSchema, status_code=HTTPStatus.CREATED
+)
+async def capture(
+    payload: CapturePayloadSchema, service: Service, current_user: CurrentUser
+):
+    return await service.capture(current_user=current_user, payload=payload)

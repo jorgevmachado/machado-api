@@ -13,7 +13,7 @@ from app.domain.pokemon.service import PokemonService
 from app.domain.trainer.owned_pokemon.business import (
     resolve_effective_nickname,
     slugify_name,
-    build_unique_owned_name,
+    build_unique_owned_name, validate_capture_rate,
 )
 from app.domain.trainer.owned_pokemon.move.service import OwnedPokemonMoveService
 
@@ -61,8 +61,11 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
         trainer_id: UUID,
         pokemon_name: str,
         nickname: str | None,
+        pokedex_hp: int | None,
+        pokedex_max_hp: int | None,
         commit: bool = True,
         only_allowed_pokemon: list[str] | None = None,
+        trainer_capture_rate: int | None = None,
     ) -> OwnedPokemon:
         try:
             pokemon_name = pokemon_name.strip().lower()
@@ -78,6 +81,12 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
                     status_code=HTTPStatus.NOT_FOUND,
                     detail="Pokemon not found",
                 )
+            validate_capture_rate(
+                pokemon=pokemon,
+                pokedex_hp=pokedex_hp,
+                pokedex_max_hp=pokedex_max_hp,
+                trainer_capture_rate=trainer_capture_rate,
+            )
 
             effective_nickname = resolve_effective_nickname(pokemon.name, nickname)
             existing_pokemons = await self.list_all(

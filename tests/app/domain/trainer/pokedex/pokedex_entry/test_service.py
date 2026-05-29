@@ -94,7 +94,12 @@ async def test_find_one_cached_builds_cache_key_with_pokedex_id() -> None:
     service.cache_service.cache.delete_cache = AsyncMock()
     service.cache_service.get_one = AsyncMock(return_value=None)
     service.cache_service.set_one = AsyncMock()
-    service.find_one = AsyncMock(return_value=SimpleNamespace(id=uuid4()))
+    service.find_one = AsyncMock(
+        return_value=SimpleNamespace(
+            id=uuid4(),
+            pokemon=SimpleNamespace(status='complete', name='bulbasaur'),
+        )
+    )
 
     await service.find_one_cached(
         param="bulbasaur",
@@ -124,3 +129,117 @@ async def test_find_one_cached_returns_cached_value_without_querying_repository(
 
     assert result is cached
     service.find_one.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sync_pokemon_updates_attributes_when_status_is_incomplete() -> None:
+    from app.models import PokemonStatusEnum
+
+    repository = AsyncMock()
+    repository.update = AsyncMock()
+
+    updated_entity = SimpleNamespace(id=uuid4())
+    repository.update.return_value = updated_entity
+
+    entity = SimpleNamespace(
+        id=uuid4(),
+        hp=10,
+        level=1,
+        speed=10,
+        max_hp=10,
+        attack=10,
+        defense=10,
+        experience=0,
+        special_attack=10,
+        special_defense=10,
+        pokemon=SimpleNamespace(
+            status=PokemonStatusEnum.INCOMPLETE,
+            name='bulbasaur',
+        ),
+    )
+
+    pokemon = _build_pokemon()
+    service = PokedexEntryService(repository=repository)
+    service.find_one = AsyncMock(return_value=entity)
+    service.pokemon_service = AsyncMock()
+    service.pokemon_service.find_one = AsyncMock(return_value=pokemon)
+
+    result = await service._sync_pokemon(param='bulbasaur', pokedex_id=str(uuid4()))
+
+    assert result is updated_entity
+    repository.update.assert_awaited_once_with(entity=entity)
+
+
+@pytest.mark.asyncio
+async def test_sync_pokemon_skips_update_when_pokemon_not_found() -> None:
+    from app.models import PokemonStatusEnum
+
+    repository = AsyncMock()
+
+    entity = SimpleNamespace(
+        id=uuid4(),
+        pokemon=SimpleNamespace(
+            status=PokemonStatusEnum.INCOMPLETE,
+            name='bulbasaur',
+        ),
+    )
+
+    service = PokedexEntryService(repository=repository)
+    service.find_one = AsyncMock(return_value=entity)
+    service.pokemon_service = AsyncMock()
+    service.pokemon_service.find_one = AsyncMock(return_value=None)
+
+    result = await service._sync_pokemon(param='bulbasaur')
+
+    assert result is entity
+    repository.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_discover_marks_entity_as_discovered_and_updates() -> None:
+    updated = SimpleNamespace(id=uuid4(), discovered=True)
+    repository = AsyncMock()
+    repository.update = AsyncMock(return_value=updated)
+
+    entity = SimpleNamespace(id=uuid4(), discovered=False)
+    service = PokedexEntryService(repository=repository)
+    service._sync_pokemon = AsyncMock(return_value=entity)
+
+    result = await service.discover(pokedex_id='pokedex-id', name='bulbasaur')
+
+    assert result is updated
+    assert entity.discovered is True
+    repository.update.assert_awaited_once_with(entity=entity)
+
+
+@pytest.mark.asyncio
+async def test_discover_returns_entity_without_throw_when_already_discovered() -> None:
+    entity = SimpleNamespace(id=uuid4(), discovered=True)
+    repository = AsyncMock()
+    service = PokedexEntryService(repository=repository)
+    service._sync_pokemon = AsyncMock(return_value=entity)
+
+    result = await service.discover(
+        pokedex_id='pokedex-id',
+        name='bulbasaur',
+        without_throw=True,
+    )
+
+    assert result is entity
+    repository.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_discover_raises_when_already_discovered_and_throw_enabled() -> None:
+    from fastapi import HTTPException
+
+    entity = SimpleNamespace(id=uuid4(), discovered=True)
+    repository = AsyncMock()
+    service = PokedexEntryService(repository=repository)
+    service._sync_pokemon = AsyncMock(return_value=entity)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.discover(pokedex_id='pokedex-id', name='bulbasaur', without_throw=False)
+
+    assert exc_info.value.status_code == 400
+    assert 'already discovered' in exc_info.value.detail

@@ -18,7 +18,9 @@ class PokedexEntrySchema(BaseModel):
     defense: int
     name: str
     pokemon: PokemonSchema
+    discovered: bool
     experience: int
+    discovered_at: datetime | None = None
     created_at: datetime
-    updated_at: datetime | None = None
+    updated_at: datetime | None = None    
     deleted_at: datetime | None = None

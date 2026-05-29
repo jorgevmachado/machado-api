@@ -59,3 +59,8 @@ class OnboardPayloadSchema(BaseModel):
     nickname: str | None = None
     pokeballs: int | None = Field(default=None, ge=1)
     capture_rate: int | None = Field(default=None, ge=1, le=255)
+
+class CapturePayloadSchema(BaseModel):
+    nickname: str | None = None
+    pokemon_name: str = Field(min_length=1)
+    

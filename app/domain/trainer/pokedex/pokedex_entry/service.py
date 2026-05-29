@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from typing import cast
 from uuid import UUID
 
 from datetime import datetime
+
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
 from app.core.service.base import BaseService
+from app.domain.pokemon.service import PokemonService
 
 from app.domain.trainer.pokedex.pokedex_entry.repository import PokedexEntryRepository
 from app.domain.trainer.pokedex.pokedex_entry.schema import (
     PokedexEntrySchema,
 )
 from app.domain.trainer.progression import build_initial_attributes
-from app.models import PokedexEntry, Pokemon
+from app.models import PokedexEntry, Pokemon, PokemonStatusEnum, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,7 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
     def __init__(
         self,
         repository: PokedexEntryRepository,
+        pokemon_service: PokemonService | None = None,
     ) -> None:
         super().__init__(
             alias="PokedexEntry",
@@ -36,6 +41,8 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
             schema_class=PokedexEntrySchema,
             cache_prefix="pokedex_entry",
         )
+        session = repository.session
+        self.pokemon_service = pokemon_service or PokemonService.from_session(session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -104,6 +111,43 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         cached = await self.cache_service.get_one(key)
         if cached:
             return cached
-        item = await self.find_one(param, **kwargs)
+        item = await self._sync_pokemon(param, **kwargs)
         await self.cache_service.set_one(key, item)
         return item
+
+    async def _sync_pokemon(
+            self,
+            param: str,
+            **kwargs,
+    ) -> PokedexEntry:
+
+        entity = await self.find_one(param, **kwargs)
+        if entity and entity.pokemon.status == PokemonStatusEnum.INCOMPLETE:
+            pokemon = await self.pokemon_service.find_one(param=entity.pokemon.name)
+            if pokemon:
+                attributes = build_initial_attributes(pokemon)
+                entity.hp = attributes.get("hp")
+                entity.level = attributes.get("level")
+                entity.speed = attributes.get("speed")
+                entity.max_hp = attributes.get("max_hp")
+                entity.attack = attributes.get("attack")
+                entity.defense = attributes.get("defense")
+                entity.experience = attributes.get("experience")
+                entity.special_attack = attributes.get("special_attack")
+                entity.special_defense = attributes.get("special_defense")
+                return await self.repository.update(entity=entity)
+        return entity
+
+    async def discover(self, pokedex_id: str, name: str, without_throw: bool = False) -> PokedexEntry:
+
+        entity = await self._sync_pokemon(param=name, pokedex_id=pokedex_id)
+        if entity.discovered:
+            if without_throw:
+                return entity
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Pokemon already discovered",
+            )
+        entity.discovered = True
+        entity.discovered_at = utcnow()
+        return await self.repository.update(entity=entity)

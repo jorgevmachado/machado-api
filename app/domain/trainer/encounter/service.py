@@ -98,3 +98,25 @@ class TrainerEncounterService(
         return await self.sync_from_resources(
             trainer_id=trainer_id, encounters=encounters
         )
+
+    async def update_list(self, trainer_id: UUID, encounters: list[Encounter]) -> list[TrainerEncounter]:
+        known_encounters = await self.list_all(
+            page_filter=FilterPage.build(trainer_id=trainer_id)
+        )
+
+        known_encounters_map = {
+            str(encounter.pokemon_encounter_id): encounter for encounter in known_encounters
+        }
+
+        for encounter in encounters:
+            known = known_encounters_map.get(str(encounter.id))
+            if known:
+                continue
+            await self.get_or_create(
+                trainer_id=trainer_id,
+                encounter=encounter,
+                is_active=False,
+            )
+        return await self.list_all(
+            page_filter=FilterPage.build(trainer_id=trainer_id)
+        )

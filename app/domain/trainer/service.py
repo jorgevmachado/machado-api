@@ -21,7 +21,7 @@ from app.domain.trainer.owned_pokemon.service import OwnedPokemonService
 from app.domain.trainer.party.service import TrainerPartyService
 from app.domain.trainer.pokedex.service import PokedexService
 from app.domain.trainer.repository import TrainerRepository
-from app.domain.trainer.schema import OnboardPayloadSchema, TrainerSchema
+from app.domain.trainer.schema import OnboardPayloadSchema, TrainerSchema, CapturePayloadSchema
 from app.models import (
     RoleEnum,
     Trainer,
@@ -162,3 +162,41 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 capture_progress_points=0,
             )
         )
+
+    async def capture(self, current_user: User, payload: CapturePayloadSchema) -> Trainer | None:
+        trainer = current_user.trainer
+        if not trainer:
+            raise HTTPException(
+                detail="User must be onboarded to capture a pokemon",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )        
+        if trainer.pokeballs <= 0:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Trainer has no pokeballs left",
+            )
+        trainer.pokeballs -= 1
+        trainer = await self.repository.update(trainer)
+        
+        pokedex = await self.pokedex_service.discover(
+            name=payload.pokemon_name,
+            trainer_id=trainer.id,
+            without_throw=True,
+        )
+
+        owned_pokemon = await self.owned_pokemon_service.create(
+            nickname=payload.nickname,
+            trainer_id=trainer.id,
+            pokedex_hp=pokedex.hp,
+            pokemon_name=payload.pokemon_name,
+            pokedex_max_hp=pokedex.max_hp,
+            trainer_capture_rate=trainer.capture_rate,
+        )
+        
+        await self.trainer_encounter_service.update_list(
+            trainer_id=trainer.id,
+            encounters=owned_pokemon.pokemon.encounters,
+        )
+
+        return await self.repository.find_by(id=trainer.id)
+

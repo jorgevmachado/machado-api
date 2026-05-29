@@ -61,9 +61,23 @@ async def list_all_cached(
 
 
 @router.get("/{param}", response_model=PokedexEntrySchema, status_code=HTTPStatus.OK)
-async def find_one(param: str, service: Service, current_trainer: CurrentTrainer):
+async def find_one(
+        param: str,
+        service: Service,
+        current_trainer: CurrentTrainer,
+        clean_cache: bool = False
+):
     return await service.find_one_cached(
         param=param,
         trainer_id=current_trainer.id,
         user_request=current_trainer.user.username,
+        clean_cache=clean_cache
     )
+
+@router.post("/{name}/discover", response_model=PokedexEntrySchema, status_code=HTTPStatus.OK)
+async def discover(
+        name: str,
+        service: Service,
+        current_trainer: CurrentTrainer
+):
+    return await service.discover(name=name, trainer_id=current_trainer.id)

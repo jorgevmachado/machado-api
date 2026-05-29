@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.domain.trainer.pokedex.route import (
+    discover,
     find_one,
     get_pokedex_filter,
     get_pokedex_service,
@@ -59,4 +60,22 @@ async def test_find_one_delegates_to_service(current_trainer: SimpleNamespace) -
         param="entry",
         trainer_id=current_trainer.id,
         user_request="ash",
+        clean_cache=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_discover_delegates_to_service(current_trainer: SimpleNamespace) -> None:
+    service = AsyncMock()
+    expected = SimpleNamespace(id="entry", discovered=True)
+    service.discover.return_value = expected
+
+    result = await discover(
+        name="bulbasaur", service=service, current_trainer=current_trainer
+    )
+
+    assert result is expected
+    service.discover.assert_awaited_once_with(
+        name="bulbasaur",
+        trainer_id=current_trainer.id,
     )

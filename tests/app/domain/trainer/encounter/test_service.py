@@ -132,3 +132,61 @@ async def test_get_or_create_list_syncs_when_no_known_or_existing_encounters() -
         trainer_id=trainer_id,
         encounters=encounters,
     )
+
+
+@pytest.mark.asyncio
+async def test_update_list_creates_missing_encounters_and_returns_all() -> None:
+    trainer_id = uuid4()
+    encounter_id = uuid4()
+    known_encounter = SimpleNamespace(pokemon_encounter_id=encounter_id)
+    new_encounter = SimpleNamespace(id=uuid4())
+
+    service = TrainerEncounterService(repository=AsyncMock())
+    service.list_all = AsyncMock(side_effect=[
+        [known_encounter],
+        [known_encounter, SimpleNamespace(pokemon_encounter_id=new_encounter.id)],
+    ])
+    service.get_or_create = AsyncMock()
+
+    result = await service.update_list(
+        trainer_id=trainer_id,
+        encounters=[SimpleNamespace(id=encounter_id), new_encounter],
+    )
+
+    service.get_or_create.assert_awaited_once_with(
+        trainer_id=trainer_id,
+        encounter=new_encounter,
+        is_active=False,
+    )
+    assert len(result) == 2
+
+
+@pytest.mark.asyncio
+async def test_update_list_skips_already_known_encounters() -> None:
+    trainer_id = uuid4()
+    encounter_id = uuid4()
+    known_encounter = SimpleNamespace(pokemon_encounter_id=encounter_id)
+
+    service = TrainerEncounterService(repository=AsyncMock())
+    service.list_all = AsyncMock(return_value=[known_encounter])
+    service.get_or_create = AsyncMock()
+
+    await service.update_list(
+        trainer_id=trainer_id,
+        encounters=[SimpleNamespace(id=encounter_id)],
+    )
+
+    service.get_or_create.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_list_returns_empty_when_no_encounters() -> None:
+    service = TrainerEncounterService(repository=AsyncMock())
+    service.list_all = AsyncMock(return_value=[])
+
+    result = await service.update_list(
+        trainer_id=uuid4(),
+        encounters=[],
+    )
+
+    assert result == []

@@ -246,6 +246,7 @@ async def test_find_one_cached_delegates_to_pokedex_entry_service(
     pokedex_entry_service.find_one_cached.assert_awaited_once_with(
         param="bulbasaur",
         pokedex_id="pokedex-id",
+        clean_cache=False,
         user_request="ash",
     )
 
@@ -307,3 +308,30 @@ async def test_get_or_create_creates_when_pokedex_does_not_exist() -> None:
 
     assert result is created
     service.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_discover_delegates_to_pokedex_entry_service(
+    trainer_session: AsyncMock,
+) -> None:
+    entry = SimpleNamespace(id=uuid4(), discovered=True)
+    pokedex_entry_service = AsyncMock()
+    pokedex_entry_service.discover = AsyncMock(return_value=entry)
+    service = PokedexService(
+        repository=_build_repository(trainer_session),
+        pokemon_service=AsyncMock(),
+        pokedex_entry_service=pokedex_entry_service,
+    )
+    service.get_by = AsyncMock(return_value='pokedex-id')
+    trainer_id = uuid4()
+
+    result = await service.discover(trainer_id=trainer_id, name='bulbasaur', without_throw=True)
+
+    assert result is entry
+    service.get_by.assert_awaited_once_with(trainer_id=str(trainer_id))
+    pokedex_entry_service.discover.assert_awaited_once_with(
+        name='bulbasaur',
+        pokedex_id='pokedex-id',
+        without_throw=True,
+    )
+

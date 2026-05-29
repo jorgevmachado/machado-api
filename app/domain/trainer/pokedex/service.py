@@ -150,10 +150,14 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
         **kwargs,
     ) -> PokedexEntry | None:
         pokedex_id = await self.get_by(
-            trainer_id=kwargs.get("trainer_id"), clean_cache=kwargs.get("clean_cache")
+            trainer_id=kwargs.get("trainer_id"),
+            clean_cache=kwargs.get("clean_cache")
         )
         return await self.pokedex_entry_service.find_one_cached(
-            param=param, pokedex_id=pokedex_id, user_request=kwargs.get("user_request")
+            param=param,
+            pokedex_id=pokedex_id,
+            clean_cache=kwargs.get("clean_cache"),
+            user_request=kwargs.get("user_request"),
         )
 
     async def get_or_create(
@@ -177,4 +181,15 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
             trainer_id=trainer_id,
             discovered_at=discovered_at,
             discovered_pokemon=discovered_pokemon,
+        )
+
+    async def discover(self, trainer_id: UUID, name: str, without_throw: bool = False) -> PokedexEntry:
+        pokedex_id = await self.get_by(
+            trainer_id=str(trainer_id)
+        )
+
+        return await self.pokedex_entry_service.discover(
+            name=name,
+            pokedex_id=pokedex_id,
+            without_throw=without_throw,
         )
