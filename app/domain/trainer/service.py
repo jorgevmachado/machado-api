@@ -22,10 +22,13 @@ from app.domain.trainer.party.service import TrainerPartyService
 from app.domain.trainer.pokedex.service import PokedexService
 from app.domain.trainer.repository import TrainerRepository
 from app.domain.trainer.schema import OnboardPayloadSchema, TrainerSchema, CapturePayloadSchema
+from app.domain.trainer.trainer_log.service import TrainerLogService
 from app.models import (
     RoleEnum,
     Trainer,
     User,
+    LogStatusEnum,
+    TrainerLogEventEnum, LogTypeEnum,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +38,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
     def __init__(
         self,
         repository: TrainerRepository,
+        trainer_log: TrainerLogService | None = None,
         owned_pokemon_service: OwnedPokemonService | None = None,
         pokemon_service: PokemonService | None = None,
         pokedex_service: PokedexService | None = None,
@@ -62,6 +66,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         self.trainer_encounter_service = (
             trainer_encounter_service or TrainerEncounterService.from_session(session)
         )
+        self.trainer_log = trainer_log or TrainerLogService.from_session(session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -79,6 +84,12 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 payload=payload,
             )
             if not trainer:
+                await self.trainer_log.create(
+                    event=TrainerLogEventEnum.CREATED,
+                    status=LogStatusEnum.ERROR,
+                    user_id=current_user.id,
+                    log_type=LogTypeEnum.TRAINER,
+                )
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
                     detail="Cannot onboard trainer, try again later!",
@@ -92,25 +103,55 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 pokemon_name=payload.pokemon_name,
                 only_allowed_pokemon=None if is_admin else STARTER_POKEMON_NAMES,
             )
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CAPTURED,
+                user_id=current_user.id,
+                log_type=LogTypeEnum.POKEMON,
+                trainer_id=trainer.id,
+                owned_pokemon=owned_pokemon,
+            )
 
-            await self.pokedex_service.get_or_create(
+            pokedex = await self.pokedex_service.get_or_create(
                 commit=False,
                 pokedex=trainer.pokedex,
                 trainer_id=trainer.id,
                 discovered_at=owned_pokemon.captured_at,
                 discovered_pokemon=owned_pokemon.pokemon,
             )
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CREATED,
+                user_id=current_user.id,
+                pokedex=pokedex,
+                log_type=LogTypeEnum.POKEDEX,
+                trainer_id=trainer.id,
+            )
 
-            await self.trainer_encounter_service.get_or_create_list(
+            trainer_encounters = await self.trainer_encounter_service.get_or_create_list(
                 trainer_id=trainer.id,
                 encounters=owned_pokemon.pokemon.encounters,
                 known_encounters=trainer.known_encounters,
             )
 
-            await self.trainer_party_service.get_or_create_list(
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CREATED,
+                user_id=current_user.id,
+                log_type=LogTypeEnum.ENCOUNTER,
+                trainer_id=trainer.id,
+                trainer_encounters=trainer_encounters,
+            )
+
+            trainer_parties = await self.trainer_party_service.get_or_create_list(
                 trainer_id=trainer.id,
                 party_slots=trainer.party_slots,
                 owned_pokemon=owned_pokemon,
+            )
+            
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CREATED,
+                user_id=current_user.id,
+                log_type=LogTypeEnum.PARTY,
+                trainer_id=trainer.id,
+                trainer_parties=trainer_parties                
             )
 
             await self.repository.session.commit()
@@ -119,6 +160,14 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             fresh = await self.repository.find_by(id=trainer.id)
 
             if fresh is None:
+                await self.trainer_log.create(
+                    event=TrainerLogEventEnum.SHOWN,
+                    status=LogStatusEnum.ERROR,
+                    user_id=current_user.id,
+                    message="Could not load created Trainer",
+                    log_type=LogTypeEnum.TRAINER,
+                    trainer_id=trainer.id,
+                )
                 raise HTTPException(
                     status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
                     detail="Could not load created Trainer",
@@ -166,11 +215,26 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
     async def capture(self, current_user: User, payload: CapturePayloadSchema) -> Trainer | None:
         trainer = current_user.trainer
         if not trainer:
+            await self.trainer_log.create(
+                status=LogStatusEnum.ERROR,
+                event=TrainerLogEventEnum.CAPTURED,
+                user_id=current_user.id,
+                message="User must be onboarded to capture a pokemon",
+                log_type=LogTypeEnum.TRAINER,
+            )
             raise HTTPException(
                 detail="User must be onboarded to capture a pokemon",
                 status_code=HTTPStatus.BAD_REQUEST,
             )        
         if trainer.pokeballs <= 0:
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CAPTURED,
+                status=LogStatusEnum.ERROR,
+                user_id=current_user.id,
+                message="Trainer has no pokeballs left",
+                log_type=LogTypeEnum.TRAINER,
+                trainer_id=trainer.id,
+            )
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Trainer has no pokeballs left",
@@ -192,10 +256,26 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             pokedex_max_hp=pokedex.max_hp,
             trainer_capture_rate=trainer.capture_rate,
         )
+
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.CAPTURED,
+            user_id=current_user.id,
+            log_type=LogTypeEnum.POKEMON,
+            trainer_id=trainer.id,
+            owned_pokemon=owned_pokemon,
+        )
         
-        await self.trainer_encounter_service.update_list(
+        trainer_encounters = await self.trainer_encounter_service.update_list(
             trainer_id=trainer.id,
             encounters=owned_pokemon.pokemon.encounters,
+        )
+
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.UPDATED,
+            user_id=current_user.id,
+            log_type=LogTypeEnum.ENCOUNTER,
+            trainer_id=trainer.id,
+            trainer_encounters=trainer_encounters,
         )
 
         return await self.repository.find_by(id=trainer.id)

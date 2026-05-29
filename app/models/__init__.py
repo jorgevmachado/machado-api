@@ -1,5 +1,5 @@
 from app.models.common import utcnow
-from app.models.enums import GenderEnum, StatusEnum, RoleEnum, PokemonStatusEnum
+from app.models.enums import GenderEnum, StatusEnum, RoleEnum, PokemonStatusEnum, TrainerLogEventEnum, LogStatusEnum, LogTypeEnum
 from app.models.user import User
 from app.models.ability import Ability
 from app.models.encounter import Encounter
@@ -27,6 +27,7 @@ from app.models.owned_pokemon import OwnedPokemon
 from app.models.owned_pokemon_move import OwnedPokemonMove
 from app.models.trainer_encounter import TrainerEncounter
 from app.models.trainer_party import TrainerParty
+from app.models.trainer_log import TrainerLog
 
 __all__ = [
     "utcnow",
@@ -54,8 +55,12 @@ __all__ = [
     "OwnedPokemonMove",
     "TrainerEncounter",
     "TrainerParty",
+    "TrainerLog",
     "RoleEnum",
     "GenderEnum",
     "StatusEnum",
+    "TrainerLogEventEnum",
+    "LogStatusEnum",
+    "LogTypeEnum",
     "PokemonStatusEnum",
 ]

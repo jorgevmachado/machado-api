@@ -21,3 +21,31 @@ class RoleEnum(str, Enum):
 class PokemonStatusEnum(str, Enum):
     COMPLETE = "COMPLETE"
     INCOMPLETE = "INCOMPLETE"
+
+
+class TrainerLogEventEnum(str, Enum):
+    WON = "WON"
+    LOST = "LOST"
+    FLEE = "FLEE"
+    SHOWN = "SHOWN"
+    MOVED = "MOVED"
+    CREATED = "CREATED"
+    UPDATED = "UPDATED"
+    DELETED = "DELETED"
+    CAPTURED = "CAPTURED"
+    DISCOVERED = "DISCOVERED"
+
+class LogStatusEnum(str, Enum):
+    INFO = "INFO"
+    ERROR = "ERROR"
+    SUCCESS = "SUCCESS"
+    WARNING = "WARNING"
+
+class LogTypeEnum(str, Enum):
+    PARTY = "PARTY"
+    BATTLE = "BATTLE"
+    POKEDEX = "POKEDEX"
+    TRAINER = "TRAINER"
+    POKEMON = "POKEMON"
+    ENCOUNTER = "ENCOUNTER"
+    
