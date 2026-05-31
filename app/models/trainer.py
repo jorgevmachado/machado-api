@@ -4,11 +4,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer
+from sqlalchemy import DateTime, ForeignKey, Integer,Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import default_lazy, table_registry
-from app.models.common import utcnow
+from app.models import PokemonStatusEnum, utcnow
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -41,6 +41,12 @@ class Trainer:
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None, init=False
+    )
+
+    status: Mapped[PokemonStatusEnum] = mapped_column(
+        SAEnum(PokemonStatusEnum, name="pokemonstatusenum"),
+        nullable=False,
+        default=PokemonStatusEnum.INCOMPLETE,
     )
 
     owned_pokemons: Mapped[list["OwnedPokemon"]] = relationship(

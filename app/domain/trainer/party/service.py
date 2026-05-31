@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +14,15 @@ from app.domain.trainer.party.repository import TrainerPartyRepository
 from app.domain.trainer.party.schema import (
     TrainerPartySchema,
 )
-from app.models import TrainerParty, OwnedPokemon
+from app.domain.trainer.trainer_log.service import TrainerLogService
+from app.models import (
+    TrainerParty,
+    OwnedPokemon,
+    Trainer,
+    TrainerLogEventEnum,
+    LogTypeEnum,
+    LogStatusEnum,
+)
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -25,6 +32,7 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
     def __init__(
         self,
         repository: TrainerPartyRepository,
+        trainer_log: TrainerLogService | None = None,
     ) -> None:
         super().__init__(
             alias="TrainerParty",
@@ -37,6 +45,8 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
             schema_class=TrainerPartySchema,
             cache_prefix="trainer_party",
         )
+        session = repository.session
+        self.trainer_log = trainer_log or TrainerLogService.from_session(session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -44,14 +54,14 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
 
     async def add(
         self,
-        trainer_id: UUID,
+        trainer: Trainer,
         owned_pokemon: OwnedPokemon,
         is_active: bool = True,
         without_throw: bool = False,
     ) -> list[TrainerParty]:
         party_list: list[TrainerParty] = []
         entity_list = await self.repository.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer_id)
+            page_filter=FilterPage.build(trainer_id=trainer.id)
         )
 
         if isinstance(entity_list, list):
@@ -60,54 +70,79 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
             party_list = entity_list.items
 
         entity = await self.repository.find_by(
-            trainer_id=trainer_id, owned_pokemon_id=owned_pokemon.id
+            trainer_id=trainer.id, owned_pokemon_id=owned_pokemon.id
         )
 
         if entity:
             return entity_list
 
         if len(party_list) >= MAX_PARTY_SIZE:
+            message = f"Trainer {trainer.id} already have {MAX_PARTY_SIZE} pokemon in party"
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CREATED,
+                user_id=trainer.user.id,
+                log_type=LogTypeEnum.PARTY,
+                status=LogStatusEnum.ERROR,
+                trainer_id=trainer.id,
+                message=message,
+            )
             if without_throw:
                 return party_list
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
-                detail=f"Trainer {trainer_id} already have {MAX_PARTY_SIZE} pokemon in party",
+                detail=message,
             )
 
         slot = len(party_list) + 1
 
-        await self.repository.save(
+        created_trainer_party = await self.repository.save(
             entity=TrainerParty(
                 slot=slot,
                 is_active=is_active,
-                trainer_id=trainer_id,
+                trainer_id=trainer.id,
                 owned_pokemon_id=owned_pokemon.id,
             )
         )
 
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.CREATED,
+            user_id=trainer.user.id,
+            log_type=LogTypeEnum.PARTY,
+            trainer_id=trainer.id,
+            trainer_parties=[created_trainer_party],
+        )
+
         return await self.repository.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer_id)
+            page_filter=FilterPage.build(trainer_id=trainer.id)
         )
 
     async def get_or_create_list(
         self,
-        trainer_id: UUID,
-        party_slots: list[TrainerParty] | None = None,
+        trainer: Trainer,
         owned_pokemon: OwnedPokemon | None = None,
     ) -> list[TrainerParty]:
+        party_slots = trainer.party_slots
         if party_slots and len(party_slots) > 0:
             return party_slots
 
         exist_party_slot = await self.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer_id)
+            page_filter=FilterPage.build(trainer_id=trainer.id)
         )
 
         if exist_party_slot:
             return exist_party_slot
 
         if not owned_pokemon:
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CREATED,
+                user_id=trainer.user.id,
+                log_type=LogTypeEnum.PARTY,
+                status=LogStatusEnum.ERROR,
+                trainer_id=trainer.id,
+                message="Could not load owned Pokemon",
+            )
             return []
 
         return await self.add(
-            trainer_id=trainer_id, owned_pokemon=owned_pokemon, without_throw=True
+            trainer=trainer, owned_pokemon=owned_pokemon, without_throw=True
         )

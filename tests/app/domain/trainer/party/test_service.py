@@ -20,6 +20,14 @@ def _build_repository(session: AsyncMock) -> AsyncMock:
     return repository
 
 
+def _build_trainer(party_slots=None) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        party_slots=party_slots,
+        user=SimpleNamespace(id=uuid4()),
+    )
+
+
 def test_from_session_builds_service() -> None:
     service = TrainerPartyService.from_session(AsyncMock())
     assert isinstance(service, TrainerPartyService)
@@ -29,14 +37,15 @@ def test_from_session_builds_service() -> None:
 async def test_add_returns_existing_list_when_owned_pokemon_already_in_party(
     trainer_session: AsyncMock,
 ) -> None:
+    trainer = _build_trainer()
     repository = _build_repository(trainer_session)
     party_list = [SimpleNamespace(id=uuid4())]
     repository.list_all.return_value = party_list
     repository.find_by.return_value = SimpleNamespace(id=uuid4())
-    service = TrainerPartyService(repository=repository)
+    service = TrainerPartyService(repository=repository, trainer_log=AsyncMock())
 
     result = await service.add(
-        trainer_id=uuid4(),
+        trainer=trainer,
         owned_pokemon=SimpleNamespace(id=uuid4()),
     )
 
@@ -48,14 +57,15 @@ async def test_add_returns_existing_list_when_owned_pokemon_already_in_party(
 async def test_add_uses_paginated_items_and_saves_new_slot(
     trainer_session: AsyncMock,
 ) -> None:
+    trainer = _build_trainer()
     repository = _build_repository(trainer_session)
     repository.list_all.side_effect = [SimpleNamespace(items=[SimpleNamespace(id=uuid4())]), ["updated"]]
     repository.find_by.return_value = None
-    service = TrainerPartyService(repository=repository)
+    service = TrainerPartyService(repository=repository, trainer_log=AsyncMock())
     owned_pokemon = SimpleNamespace(id=uuid4())
 
     result = await service.add(
-        trainer_id=uuid4(),
+        trainer=trainer,
         owned_pokemon=owned_pokemon,
         is_active=False,
     )
@@ -72,14 +82,15 @@ async def test_add_uses_paginated_items_and_saves_new_slot(
 async def test_add_returns_existing_party_when_full_and_without_throw(
     trainer_session: AsyncMock,
 ) -> None:
+    trainer = _build_trainer()
     repository = _build_repository(trainer_session)
     full_party = [SimpleNamespace(id=uuid4()) for _ in range(MAX_PARTY_SIZE)]
     repository.list_all.return_value = full_party
     repository.find_by.return_value = None
-    service = TrainerPartyService(repository=repository)
+    service = TrainerPartyService(repository=repository, trainer_log=AsyncMock())
 
     result = await service.add(
-        trainer_id=uuid4(),
+        trainer=trainer,
         owned_pokemon=SimpleNamespace(id=uuid4()),
         without_throw=True,
     )
@@ -92,16 +103,17 @@ async def test_add_returns_existing_party_when_full_and_without_throw(
 async def test_add_raises_when_party_is_full_and_without_throw_is_false(
     trainer_session: AsyncMock,
 ) -> None:
+    trainer = _build_trainer()
     repository = _build_repository(trainer_session)
     repository.list_all.return_value = [
         SimpleNamespace(id=uuid4()) for _ in range(MAX_PARTY_SIZE)
     ]
     repository.find_by.return_value = None
-    service = TrainerPartyService(repository=repository)
+    service = TrainerPartyService(repository=repository, trainer_log=AsyncMock())
 
     with pytest.raises(HTTPException, match="already have"):
         await service.add(
-            trainer_id=uuid4(),
+            trainer=trainer,
             owned_pokemon=SimpleNamespace(id=uuid4()),
             without_throw=False,
         )
@@ -111,12 +123,12 @@ async def test_add_raises_when_party_is_full_and_without_throw_is_false(
 async def test_get_or_create_list_returns_given_party_slots(
     trainer_session: AsyncMock,
 ) -> None:
-    service = TrainerPartyService(repository=_build_repository(trainer_session))
     party_slots = [SimpleNamespace(id=uuid4())]
+    trainer = _build_trainer(party_slots=party_slots)
+    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
 
     result = await service.get_or_create_list(
-        trainer_id=uuid4(),
-        party_slots=party_slots,
+        trainer=trainer,
         owned_pokemon=SimpleNamespace(id=uuid4()),
     )
 
@@ -128,12 +140,12 @@ async def test_get_or_create_list_returns_existing_party_slots_from_list_all(
     trainer_session: AsyncMock,
 ) -> None:
     existing = [SimpleNamespace(id=uuid4())]
-    service = TrainerPartyService(repository=_build_repository(trainer_session))
+    trainer = _build_trainer(party_slots=None)
+    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
     service.list_all = AsyncMock(return_value=existing)
 
     result = await service.get_or_create_list(
-        trainer_id=uuid4(),
-        party_slots=None,
+        trainer=trainer,
         owned_pokemon=SimpleNamespace(id=uuid4()),
     )
 
@@ -144,13 +156,13 @@ async def test_get_or_create_list_returns_existing_party_slots_from_list_all(
 async def test_get_or_create_list_returns_empty_when_owned_pokemon_is_missing(
     trainer_session: AsyncMock,
 ) -> None:
-    service = TrainerPartyService(repository=_build_repository(trainer_session))
+    trainer = _build_trainer(party_slots=None)
+    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
     service.list_all = AsyncMock(return_value=[])
     service.add = AsyncMock()
 
     result = await service.get_or_create_list(
-        trainer_id=uuid4(),
-        party_slots=None,
+        trainer=trainer,
         owned_pokemon=None,
     )
 
@@ -164,20 +176,19 @@ async def test_get_or_create_list_delegates_to_add_when_needed(
 ) -> None:
     expected = [SimpleNamespace(id=uuid4())]
     owned_pokemon = SimpleNamespace(id=uuid4())
-    service = TrainerPartyService(repository=_build_repository(trainer_session))
+    trainer = _build_trainer(party_slots=[])
+    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
     service.list_all = AsyncMock(return_value=[])
     service.add = AsyncMock(return_value=expected)
-    trainer_id = uuid4()
 
     result = await service.get_or_create_list(
-        trainer_id=trainer_id,
-        party_slots=[],
+        trainer=trainer,
         owned_pokemon=owned_pokemon,
     )
 
     assert result is expected
     service.add.assert_awaited_once_with(
-        trainer_id=trainer_id,
+        trainer=trainer,
         owned_pokemon=owned_pokemon,
         without_throw=True,
     )

@@ -258,11 +258,13 @@ async def test_get_or_create_returns_given_pokedex_without_querying() -> None:
         repository=_build_repository(AsyncMock()),
         pokemon_service=AsyncMock(),
         pokedex_entry_service=AsyncMock(),
+        trainer_log=AsyncMock(),
     )
     service.find_by = AsyncMock()
     service.create = AsyncMock()
+    trainer = SimpleNamespace(id=uuid4(), pokedex=pokedex, user_id=uuid4())
 
-    result = await service.get_or_create(trainer_id=uuid4(), pokedex=pokedex)
+    result = await service.get_or_create(trainer=trainer)
 
     assert result is pokedex
     service.find_by.assert_not_awaited()
@@ -276,11 +278,13 @@ async def test_get_or_create_returns_existing_pokedex_when_found() -> None:
         repository=_build_repository(AsyncMock()),
         pokemon_service=AsyncMock(),
         pokedex_entry_service=AsyncMock(),
+        trainer_log=AsyncMock(),
     )
     service.find_by = AsyncMock(return_value=existing)
     service.create = AsyncMock()
+    trainer = SimpleNamespace(id=uuid4(), pokedex=None, user_id=uuid4())
 
-    result = await service.get_or_create(trainer_id=uuid4())
+    result = await service.get_or_create(trainer=trainer)
 
     assert result is existing
     service.create.assert_not_awaited()
@@ -290,17 +294,18 @@ async def test_get_or_create_returns_existing_pokedex_when_found() -> None:
 async def test_get_or_create_creates_when_pokedex_does_not_exist() -> None:
     created = SimpleNamespace(id=uuid4())
     discovered_pokemon = SimpleNamespace(id=uuid4())
-    trainer_id = uuid4()
+    trainer = SimpleNamespace(id=uuid4(), pokedex=None, user_id=uuid4())
     service = PokedexService(
         repository=_build_repository(AsyncMock()),
         pokemon_service=AsyncMock(),
         pokedex_entry_service=AsyncMock(),
+        trainer_log=AsyncMock(),
     )
     service.find_by = AsyncMock(return_value=None)
     service.create = AsyncMock(return_value=created)
 
     result = await service.get_or_create(
-        trainer_id=trainer_id,
+        trainer=trainer,
         commit=False,
         discovered_at=datetime.now(tz=timezone.utc),
         discovered_pokemon=discovered_pokemon,
@@ -324,13 +329,15 @@ async def test_discover_delegates_to_pokedex_entry_service(
     )
     service.get_by = AsyncMock(return_value='pokedex-id')
     trainer_id = uuid4()
+    trainer = SimpleNamespace(id=trainer_id)
 
-    result = await service.discover(trainer_id=trainer_id, name='bulbasaur', without_throw=True)
+    result = await service.discover(trainer=trainer, name='bulbasaur', without_throw=True)
 
     assert result is entry
     service.get_by.assert_awaited_once_with(trainer_id=str(trainer_id))
     pokedex_entry_service.discover.assert_awaited_once_with(
         name='bulbasaur',
+        trainer=trainer,
         pokedex_id='pokedex-id',
         without_throw=True,
     )

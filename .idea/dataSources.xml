@@ -8,7 +8,7 @@
       <jdbc-url>jdbc:postgresql://localhost:5432/machadoSpecDB</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="0@localhost" uuid="e52cf252-08dc-405f-96a9-0ac86e6e6d1f">
+    <data-source source="LOCAL" name="0@localhost" uuid="bcb87090-b4a4-455b-8b9c-6b1c0783136a">
       <driver-ref>redis</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>jdbc.RedisDriver</jdbc-driver>

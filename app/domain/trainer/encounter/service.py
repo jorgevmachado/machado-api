@@ -13,7 +13,15 @@ from app.domain.trainer.encounter.repository import TrainerEncounterRepository
 from app.domain.trainer.encounter.schema import (
     TrainerEncounterSchema,
 )
-from app.models import Encounter, TrainerEncounter
+from app.domain.trainer.trainer_log.service import TrainerLogService
+from app.models import (
+    Encounter,
+    TrainerEncounter,
+    Trainer,
+    TrainerLogEventEnum,
+    LogTypeEnum,
+    LogStatusEnum,
+)
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -25,6 +33,7 @@ class TrainerEncounterService(
     def __init__(
         self,
         repository: TrainerEncounterRepository,
+        trainer_log: TrainerLogService | None = None,
     ) -> None:
         super().__init__(
             alias="TrainerEncounter",
@@ -37,6 +46,8 @@ class TrainerEncounterService(
             schema_class=TrainerEncounterSchema,
             cache_prefix="trainer_encounter",
         )
+        session = repository.session
+        self.trainer_log = trainer_log or TrainerLogService.from_session(session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -78,30 +89,48 @@ class TrainerEncounterService(
 
     async def get_or_create_list(
         self,
-        trainer_id: UUID,
-        known_encounters: list[TrainerEncounter] | None = None,
+        trainer: Trainer,
         encounters: list[Encounter] | None = None,
     ) -> list[TrainerEncounter]:
+        known_encounters = trainer.known_encounters
         if known_encounters and len(known_encounters) > 0:
             return known_encounters
 
         exist_know_encounters = await self.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer_id)
+            page_filter=FilterPage.build(trainer_id=trainer.id)
         )
 
         if exist_know_encounters:
             return exist_know_encounters
 
         if not encounters:
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.CREATED,
+                user_id=trainer.user.id,
+                log_type=LogTypeEnum.ENCOUNTER,
+                status=LogStatusEnum.ERROR,
+                trainer_id=trainer.id,
+                message="Could not load encounters",
+            )
             return []
 
-        return await self.sync_from_resources(
-            trainer_id=trainer_id, encounters=encounters
+        trainer_encounters = await self.sync_from_resources(
+            trainer_id=trainer.id, encounters=encounters
         )
 
-    async def update_list(self, trainer_id: UUID, encounters: list[Encounter]) -> list[TrainerEncounter]:
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.CREATED,
+            user_id=trainer.user.id,
+            log_type=LogTypeEnum.ENCOUNTER,
+            trainer_id=trainer.id,
+            trainer_encounters=trainer_encounters,
+        )
+        
+        return trainer_encounters
+
+    async def update_list(self, trainer: Trainer, encounters: list[Encounter]) -> list[TrainerEncounter]:
         known_encounters = await self.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer_id)
+            page_filter=FilterPage.build(trainer_id=trainer.id)
         )
 
         known_encounters_map = {
@@ -112,11 +141,18 @@ class TrainerEncounterService(
             known = known_encounters_map.get(str(encounter.id))
             if known:
                 continue
-            await self.get_or_create(
-                trainer_id=trainer_id,
+            created_encounter = await self.get_or_create(
+                trainer_id=trainer.id,
                 encounter=encounter,
                 is_active=False,
             )
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.UPDATED,
+                user_id=trainer.user.id,
+                log_type=LogTypeEnum.ENCOUNTER,
+                trainer_id=trainer.id,
+                trainer_encounters=[created_encounter],
+            )
         return await self.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer_id)
+            page_filter=FilterPage.build(trainer_id=trainer.id)
         )

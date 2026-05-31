@@ -19,7 +19,17 @@ from app.domain.trainer.pokedex.pokedex_entry.schema import (
     PokedexEntrySchema,
 )
 from app.domain.trainer.progression import build_initial_attributes
-from app.models import PokedexEntry, Pokemon, PokemonStatusEnum, utcnow
+from app.domain.trainer.trainer_log.service import TrainerLogService
+from app.models import (
+    PokedexEntry,
+    Pokemon,
+    PokemonStatusEnum,
+    utcnow,
+    TrainerLogEventEnum,
+    Trainer,
+    LogTypeEnum,
+    LogStatusEnum,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +39,7 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         self,
         repository: PokedexEntryRepository,
         pokemon_service: PokemonService | None = None,
+        trainer_log: TrainerLogService | None = None,
     ) -> None:
         super().__init__(
             alias="PokedexEntry",
@@ -43,6 +54,7 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         )
         session = repository.session
         self.pokemon_service = pokemon_service or PokemonService.from_session(session)
+        self.trainer_log = trainer_log or TrainerLogService.from_session(session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -138,16 +150,35 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
                 return await self.repository.update(entity=entity)
         return entity
 
-    async def discover(self, pokedex_id: str, name: str, without_throw: bool = False) -> PokedexEntry:
+    async def discover(self, pokedex_id: str, trainer: Trainer, name: str, without_throw: bool = False) -> PokedexEntry:
 
         entity = await self._sync_pokemon(param=name, pokedex_id=pokedex_id)
         if entity.discovered:
+            message = f"Pokemon {name} already discovered"
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.DISCOVERED,
+                user_id=trainer.user.id,
+                status=LogStatusEnum.ERROR,
+                log_type=LogTypeEnum.POKEDEX,
+                trainer_id=trainer.id,
+                message=message,
+            )
             if without_throw:
                 return entity
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
-                detail="Pokemon already discovered",
+                detail=message,
             )
         entity.discovered = True
         entity.discovered_at = utcnow()
-        return await self.repository.update(entity=entity)
+        updated_pokedex_entry = await self.repository.update(entity=entity)
+
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.DISCOVERED,
+            user_id=trainer.user.id,
+            status=LogStatusEnum.SUCCESS if updated_pokedex_entry else LogStatusEnum.ERROR,
+            log_type=LogTypeEnum.POKEDEX,
+            trainer_id=trainer.id,
+        )
+
+        return updated_pokedex_entry

@@ -19,7 +19,15 @@ from app.domain.trainer.pokedex.repository import PokedexRepository
 from app.domain.trainer.pokedex.schema import (
     PokedexSchema,
 )
-from app.models import Pokedex, Pokemon, PokedexEntry
+from app.domain.trainer.trainer_log.service import TrainerLogService
+from app.models import (
+    Pokedex,
+    Pokemon,
+    PokedexEntry,
+    Trainer,
+    TrainerLogEventEnum,
+    LogTypeEnum,
+)
 from app.shared.schemas import FilterPage
 
 logger = logging.getLogger(__name__)
@@ -31,6 +39,7 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
         repository: PokedexRepository,
         pokemon_service: PokemonService | None = None,
         pokedex_entry_service: PokedexEntryService | None = None,
+        trainer_log: TrainerLogService | None = None,
     ) -> None:
         super().__init__(
             alias="Pokedex",
@@ -48,6 +57,7 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
         self.pokedex_entry_service = (
             pokedex_entry_service or PokedexEntryService.from_session(session)
         )
+        self.trainer_log = trainer_log or TrainerLogService.from_session(session)
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -162,34 +172,44 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
 
     async def get_or_create(
         self,
-        trainer_id: UUID,
+        trainer: Trainer,
         commit: bool = True,
         discovered_at: datetime | None = None,
         discovered_pokemon: Pokemon | None = None,
-        pokedex: Pokedex | None = None,
     ) -> Pokedex:
-        if pokedex:
-            return pokedex
+        if trainer.pokedex:
+            return trainer.pokedex
 
-        exist_pokedex = await self.find_by(trainer_id=trainer_id, without_throw=True)
+        exist_pokedex = await self.find_by(trainer_id=trainer.id, without_throw=True)
 
         if exist_pokedex:
             return exist_pokedex
 
-        return await self.create(
+        created_pokedex = await self.create(
             commit=commit,
-            trainer_id=trainer_id,
+            trainer_id=trainer.id,
             discovered_at=discovered_at,
             discovered_pokemon=discovered_pokemon,
         )
 
-    async def discover(self, trainer_id: UUID, name: str, without_throw: bool = False) -> PokedexEntry:
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.CREATED,
+            user_id=trainer.user_id,
+            pokedex=created_pokedex,
+            log_type=LogTypeEnum.POKEDEX,
+            trainer_id=trainer.id,
+        )
+        
+        return created_pokedex
+
+    async def discover(self, trainer: Trainer, name: str, without_throw: bool = False) -> PokedexEntry:
         pokedex_id = await self.get_by(
-            trainer_id=str(trainer_id)
+            trainer_id=str(trainer.id)
         )
 
         return await self.pokedex_entry_service.discover(
             name=name,
+            trainer=trainer,
             pokedex_id=pokedex_id,
             without_throw=without_throw,
         )

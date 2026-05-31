@@ -28,7 +28,9 @@ from app.models import (
     Trainer,
     User,
     LogStatusEnum,
-    TrainerLogEventEnum, LogTypeEnum,
+    TrainerLogEventEnum,
+    LogTypeEnum,
+    PokemonStatusEnum,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,75 +86,58 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
                 payload=payload,
             )
             if not trainer:
-                await self.trainer_log.create(
-                    event=TrainerLogEventEnum.CREATED,
-                    status=LogStatusEnum.ERROR,
-                    user_id=current_user.id,
-                    log_type=LogTypeEnum.TRAINER,
-                )
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
                     detail="Cannot onboard trainer, try again later!",
                 )
 
-            owned_pokemon = await self.owned_pokemon_service.get_or_create(
-                commit=False,
-                nickname=payload.nickname,
-                trainer_id=trainer.id,
-                owned_pokemons=trainer.owned_pokemons,
-                pokemon_name=payload.pokemon_name,
-                only_allowed_pokemon=None if is_admin else STARTER_POKEMON_NAMES,
-            )
-            await self.trainer_log.create(
-                event=TrainerLogEventEnum.CAPTURED,
-                user_id=current_user.id,
-                log_type=LogTypeEnum.POKEMON,
-                trainer_id=trainer.id,
-                owned_pokemon=owned_pokemon,
-            )
+            if trainer.status == PokemonStatusEnum.COMPLETE:
+                raise HTTPException(
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    detail="Trainer is already onboarded",
+                )
+            owned_pokemons = trainer.owned_pokemons
+            owned_pokemon = owned_pokemons[0] if owned_pokemons else None
+            if not owned_pokemon:
+                owned_pokemon = await self.owned_pokemon_service.get_or_create(
+                    commit=False,
+                    nickname=payload.nickname,
+                    trainer=trainer,
+                    owned_pokemons=trainer.owned_pokemons,
+                    pokemon_name=payload.pokemon_name,
+                    only_allowed_pokemon=None if is_admin else STARTER_POKEMON_NAMES,
+                )
+                await self.trainer_log.create(
+                    event=TrainerLogEventEnum.CAPTURED,
+                    user_id=current_user.id,
+                    log_type=LogTypeEnum.POKEMON,
+                    trainer_id=trainer.id,
+                    owned_pokemon=owned_pokemon,
+                )
 
             pokedex = await self.pokedex_service.get_or_create(
                 commit=False,
-                pokedex=trainer.pokedex,
-                trainer_id=trainer.id,
+                trainer=trainer,
                 discovered_at=owned_pokemon.captured_at,
                 discovered_pokemon=owned_pokemon.pokemon,
             )
-            await self.trainer_log.create(
-                event=TrainerLogEventEnum.CREATED,
-                user_id=current_user.id,
-                pokedex=pokedex,
-                log_type=LogTypeEnum.POKEDEX,
-                trainer_id=trainer.id,
-            )
+
 
             trainer_encounters = await self.trainer_encounter_service.get_or_create_list(
-                trainer_id=trainer.id,
+                trainer=trainer,
                 encounters=owned_pokemon.pokemon.encounters,
-                known_encounters=trainer.known_encounters,
             )
 
-            await self.trainer_log.create(
-                event=TrainerLogEventEnum.CREATED,
-                user_id=current_user.id,
-                log_type=LogTypeEnum.ENCOUNTER,
-                trainer_id=trainer.id,
-                trainer_encounters=trainer_encounters,
-            )
 
             trainer_parties = await self.trainer_party_service.get_or_create_list(
-                trainer_id=trainer.id,
-                party_slots=trainer.party_slots,
+                trainer=trainer,
                 owned_pokemon=owned_pokemon,
             )
-            
-            await self.trainer_log.create(
-                event=TrainerLogEventEnum.CREATED,
-                user_id=current_user.id,
-                log_type=LogTypeEnum.PARTY,
-                trainer_id=trainer.id,
-                trainer_parties=trainer_parties                
-            )
+
+            if owned_pokemons and pokedex and trainer_encounters and trainer_parties:
+                trainer.status = PokemonStatusEnum.COMPLETE
+
+            await self.repository.update(trainer)
 
             await self.repository.session.commit()
             await self.repository.session.refresh(trainer)
@@ -201,16 +186,29 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         if is_admin:
             pokeballs = payload.pokeballs or DEFAULT_TRAINER_POKEBALLS
             capture_rate = payload.capture_rate or DEFAULT_TRAINER_POKEBALLS
-
-        return await self.repository.save(
+        
+        created_trainer = await self.repository.save(
             entity=Trainer(
                 user_id=user_id,
+                status=PokemonStatusEnum.INCOMPLETE,
                 pokeballs=pokeballs,
                 capture_rate=capture_rate,
                 base_capture_rate=DEFAULT_TRAINER_CAPTURE_RATE,
                 capture_progress_points=0,
             )
         )
+
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.CREATED,
+            user_id=user_id,
+            trainer_id=created_trainer.id if created_trainer else None,
+            log_type=LogTypeEnum.TRAINER,
+            payload={
+                "is_admin": is_admin,
+            }
+        )
+        
+        return created_trainer
 
     async def capture(self, current_user: User, payload: CapturePayloadSchema) -> Trainer | None:
         trainer = current_user.trainer
@@ -244,13 +242,13 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         
         pokedex = await self.pokedex_service.discover(
             name=payload.pokemon_name,
-            trainer_id=trainer.id,
+            trainer=trainer,
             without_throw=True,
         )
 
         owned_pokemon = await self.owned_pokemon_service.create(
             nickname=payload.nickname,
-            trainer_id=trainer.id,
+            trainer=trainer,
             pokedex_hp=pokedex.hp,
             pokemon_name=payload.pokemon_name,
             pokedex_max_hp=pokedex.max_hp,
@@ -266,7 +264,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         )
         
         trainer_encounters = await self.trainer_encounter_service.update_list(
-            trainer_id=trainer.id,
+            trainer=trainer,
             encounters=owned_pokemon.pokemon.encounters,
         )
 

@@ -15,6 +15,13 @@ def test_from_session_builds_service() -> None:
     assert isinstance(service, PokedexEntryService)
 
 
+def _build_trainer() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        user=SimpleNamespace(id=uuid4()),
+    )
+
+
 def _build_pokemon(name: str = "bulbasaur") -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
@@ -202,10 +209,11 @@ async def test_discover_marks_entity_as_discovered_and_updates() -> None:
     repository.update = AsyncMock(return_value=updated)
 
     entity = SimpleNamespace(id=uuid4(), discovered=False)
-    service = PokedexEntryService(repository=repository)
+    service = PokedexEntryService(repository=repository, trainer_log=AsyncMock())
     service._sync_pokemon = AsyncMock(return_value=entity)
+    trainer = _build_trainer()
 
-    result = await service.discover(pokedex_id='pokedex-id', name='bulbasaur')
+    result = await service.discover(pokedex_id='pokedex-id', trainer=trainer, name='bulbasaur')
 
     assert result is updated
     assert entity.discovered is True
@@ -216,11 +224,13 @@ async def test_discover_marks_entity_as_discovered_and_updates() -> None:
 async def test_discover_returns_entity_without_throw_when_already_discovered() -> None:
     entity = SimpleNamespace(id=uuid4(), discovered=True)
     repository = AsyncMock()
-    service = PokedexEntryService(repository=repository)
+    service = PokedexEntryService(repository=repository, trainer_log=AsyncMock())
     service._sync_pokemon = AsyncMock(return_value=entity)
+    trainer = _build_trainer()
 
     result = await service.discover(
         pokedex_id='pokedex-id',
+        trainer=trainer,
         name='bulbasaur',
         without_throw=True,
     )
@@ -235,11 +245,12 @@ async def test_discover_raises_when_already_discovered_and_throw_enabled() -> No
 
     entity = SimpleNamespace(id=uuid4(), discovered=True)
     repository = AsyncMock()
-    service = PokedexEntryService(repository=repository)
+    service = PokedexEntryService(repository=repository, trainer_log=AsyncMock())
     service._sync_pokemon = AsyncMock(return_value=entity)
+    trainer = _build_trainer()
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.discover(pokedex_id='pokedex-id', name='bulbasaur', without_throw=False)
+        await service.discover(pokedex_id='pokedex-id', trainer=trainer, name='bulbasaur', without_throw=False)
 
     assert exc_info.value.status_code == 400
     assert 'already discovered' in exc_info.value.detail

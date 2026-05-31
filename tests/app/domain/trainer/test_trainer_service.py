@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from app.core.exceptions import AppHTTPException
 from app.domain.trainer.schema import CapturePayloadSchema, OnboardPayloadSchema
 from app.domain.trainer.service import TrainerService
-from app.models import RoleEnum
+from app.models import PokemonStatusEnum, RoleEnum
 
 
 def _build_repository(session: AsyncMock) -> AsyncMock:
@@ -28,6 +28,7 @@ def _build_trainer() -> SimpleNamespace:
         pokedex=None,
         known_encounters=[],
         party_slots=[],
+        status=PokemonStatusEnum.INCOMPLETE,
     )
 
 
@@ -40,6 +41,7 @@ def _build_trainer_with_pokeballs(pokeballs: int = 5) -> SimpleNamespace:
         pokedex=None,
         known_encounters=[],
         party_slots=[],
+        status=PokemonStatusEnum.INCOMPLETE,
     )
 
 
@@ -113,6 +115,7 @@ async def test_onboard_uses_existing_trainer_when_user_is_already_onboarded(
     trainer_party_service.get_or_create_list = AsyncMock()
     service = TrainerService(
         repository=repository,
+        trainer_log=AsyncMock(),
         owned_pokemon_service=owned_pokemon_service,
         pokemon_service=AsyncMock(),
         pokedex_service=pokedex_service,
@@ -128,6 +131,71 @@ async def test_onboard_uses_existing_trainer_when_user_is_already_onboarded(
     assert result is trainer
     repository.find_by.assert_awaited()
     owned_pokemon_service.get_or_create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_onboard_raises_when_trainer_is_already_onboarded(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer.status = PokemonStatusEnum.COMPLETE
+    repository = _build_repository(trainer_session)
+    repository.find_by = AsyncMock(return_value=trainer)
+    service = TrainerService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+        pokemon_service=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        trainer_encounter_service=AsyncMock(),
+        trainer_party_service=AsyncMock(),
+    )
+    user = SimpleNamespace(
+        id=uuid4(), trainer=SimpleNamespace(id=trainer.id), role=RoleEnum.USER
+    )
+
+    with pytest.raises(AppHTTPException, match="already onboarded"):
+        await service.onboard(user, OnboardPayloadSchema(pokemon_name="bulbasaur"))
+
+
+@pytest.mark.asyncio
+async def test_onboard_sets_status_complete_when_trainer_already_has_pokemon(
+    trainer_session: AsyncMock,
+) -> None:
+    owned_pokemon = _build_owned_pokemon()
+    trainer = _build_trainer()
+    trainer.owned_pokemons = [owned_pokemon]
+    repository = _build_repository(trainer_session)
+    repository.save.return_value = trainer
+    repository.find_by = AsyncMock(return_value=trainer)
+    pokedex_service = AsyncMock()
+    pokedex_service.get_or_create = AsyncMock(return_value=SimpleNamespace(id=uuid4()))
+    trainer_encounter_service = AsyncMock()
+    trainer_encounter_service.get_or_create_list = AsyncMock(
+        return_value=[SimpleNamespace(id=uuid4())]
+    )
+    trainer_party_service = AsyncMock()
+    trainer_party_service.get_or_create_list = AsyncMock(
+        return_value=[SimpleNamespace(id=uuid4())]
+    )
+    service = TrainerService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+        pokemon_service=AsyncMock(),
+        pokedex_service=pokedex_service,
+        trainer_encounter_service=trainer_encounter_service,
+        trainer_party_service=trainer_party_service,
+    )
+    service.cache_service.delete_domain = AsyncMock()
+    user = SimpleNamespace(
+        id=uuid4(), trainer=SimpleNamespace(id=trainer.id), role=RoleEnum.USER
+    )
+
+    result = await service.onboard(user, OnboardPayloadSchema(pokemon_name="bulbasaur"))
+
+    assert result is trainer
+    assert trainer.status == PokemonStatusEnum.COMPLETE
 
 
 @pytest.mark.asyncio
@@ -193,6 +261,7 @@ async def test_onboard_happy_path_for_admin(trainer_session: AsyncMock) -> None:
 
     service = TrainerService(
         repository=repository,
+        trainer_log=AsyncMock(),
         owned_pokemon_service=owned_pokemon_service,
         pokemon_service=AsyncMock(),
         pokedex_service=pokedex_service,
@@ -232,6 +301,7 @@ async def test_onboard_raises_when_created_trainer_cannot_be_reloaded(
 
     service = TrainerService(
         repository=repository,
+        trainer_log=AsyncMock(),
         owned_pokemon_service=owned_pokemon_service,
         pokemon_service=AsyncMock(),
         pokedex_service=AsyncMock(),
@@ -414,6 +484,7 @@ async def test_capture_decrements_pokeballs_and_returns_trainer(trainer_session:
 
     service = TrainerService(
         repository=repository,
+        trainer_log=AsyncMock(),
         owned_pokemon_service=owned_pokemon_service,
         pokemon_service=AsyncMock(),
         pokedex_service=pokedex_service,
@@ -432,19 +503,19 @@ async def test_capture_decrements_pokeballs_and_returns_trainer(trainer_session:
     repository.update.assert_awaited_once_with(trainer)
     pokedex_service.discover.assert_awaited_once_with(
         name='bulbasaur',
-        trainer_id=updated_trainer.id,
+        trainer=updated_trainer,
         without_throw=True,
     )
     owned_pokemon_service.create.assert_awaited_once_with(
         nickname='Bulba',
-        trainer_id=updated_trainer.id,
+        trainer=updated_trainer,
         pokedex_hp=pokedex_entry.hp,
         pokemon_name='bulbasaur',
         pokedex_max_hp=pokedex_entry.max_hp,
         trainer_capture_rate=updated_trainer.capture_rate,
     )
     trainer_encounter_service.update_list.assert_awaited_once_with(
-        trainer_id=updated_trainer.id,
+        trainer=updated_trainer,
         encounters=owned_pokemon.pokemon.encounters,
     )
     repository.find_by.assert_awaited_once_with(id=updated_trainer.id)
@@ -470,6 +541,7 @@ async def test_capture_returns_reloaded_trainer_after_all_operations(trainer_ses
 
     service = TrainerService(
         repository=repository,
+        trainer_log=AsyncMock(),
         owned_pokemon_service=owned_pokemon_service,
         pokemon_service=AsyncMock(),
         pokedex_service=pokedex_service,

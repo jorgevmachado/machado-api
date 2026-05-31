@@ -17,7 +17,6 @@ from app.models import (
     LogTypeEnum,
     LogStatusEnum,
     TrainerLogEventEnum,
-    Trainer,
     OwnedPokemon,
     Pokedex,
     TrainerEncounter,
@@ -25,6 +24,17 @@ from app.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_value(value):
+    """Recursively convert UUIDs and datetimes to strings."""
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, list):
+        return [_serialize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize_value(v) for k, v in value.items()}
+    return value
 
 
 class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
@@ -68,6 +78,7 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
             type=log_type,
             event=event,
             payload=current_payload,
+            message="",
             status=LogStatusEnum.SUCCESS,
             trainer_id=trainer_id,
         )
@@ -85,7 +96,7 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
                 entity.payload = {
                     "name": owned_pokemon.pokemon.name,
                     "nickname": owned_pokemon.nickname,
-                    "captured_at": owned_pokemon.captured_at,
+                    "captured_at": owned_pokemon.captured_at.isoformat() if owned_pokemon.captured_at else None,
                     **current_payload,
                 }
             
@@ -102,7 +113,7 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
                     "total": len(entries),
                     "pokedex_id": str(pokedex.id),
                     "pokemon_name": selected.name if selected else None,
-                    "discovered_at": selected.discovered_at if selected else None,
+                    "discovered_at": selected.discovered_at.isoformat() if selected else None,
                     **current_payload,
                 }
                 
@@ -114,7 +125,7 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
                 selected = next((item for item in trainer_encounters if item.is_active), None)
                 entity.payload = {
                     "total": len(trainer_encounters),
-                    "active_encounter": selected.pokemon_encounter_id if selected else None,
+                    "active_encounter": str(selected.pokemon_encounter_id) if selected else None,
                     **current_payload,
                 }
 
@@ -124,7 +135,7 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
             entity.status = status
             if trainer_parties:
                 active_pokemons = [
-                    item.owned_pokemon.name if item.owned_pokemon else item.owned_pokemon_id
+                    item.owned_pokemon.name if item.owned_pokemon else str(item.owned_pokemon_id)
                     for item in trainer_parties
                     if item.is_active
                 ]
@@ -138,5 +149,8 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
             status_message = 'error' if status == LogStatusEnum.ERROR else 'successfully'
             message = f"{log_type} {event} {status_message}"
         entity.message = message
+
+        # Ensure all payload values are JSON-serializable
+        entity.payload = _serialize_value(entity.payload)
 
         return await self.repository.save(entity=entity)
