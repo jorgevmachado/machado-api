@@ -58,8 +58,7 @@ async def list_all(
     service: Service,
     current_user: CurrentUser,
     page_filter: Annotated[FilterPage, Depends(get_type_filter)] = None,
-):
-    print("HERE")
+):    
     return await service.list_all_cached(
         page_filter=page_filter,
         user_request=current_user.username,
@@ -68,7 +67,7 @@ async def list_all(
 
 @router.get("/{param}", response_model=TypeSchema, status_code=HTTPStatus.OK)
 async def find_one(param: str, service: Service, current_user: CurrentUser):
-    return await service.find_one(
+    return await service.find_one_cached(
         param=param,
         user_request=current_user.username,
     )

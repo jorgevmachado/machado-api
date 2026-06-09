@@ -57,7 +57,7 @@ class TestTypeRoute:
         current_user: SimpleNamespace,
     ) -> None:
         expected = SimpleNamespace(name="grass")
-        type_route_service.find_one.return_value = expected
+        type_route_service.find_one_cached.return_value = expected
 
         result = await find_one(
             param="grass",
@@ -66,7 +66,7 @@ class TestTypeRoute:
         )
 
         assert result is expected
-        type_route_service.find_one.assert_awaited_once_with(
+        type_route_service.find_one_cached.assert_awaited_once_with(
             param="grass",
             user_request="username",
         )
