@@ -16,6 +16,7 @@ class MoveSchema(BaseModel):
     order: int
     target: str
     effect: str
+    priority: int
     accuracy: int
     short_effect: str
     damage_class: str

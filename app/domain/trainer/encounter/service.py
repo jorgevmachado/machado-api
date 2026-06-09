@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
@@ -156,3 +158,56 @@ class TrainerEncounterService(
         return await self.list_all(
             page_filter=FilterPage.build(trainer_id=trainer.id)
         )
+    
+    async def select_active(self, trainer: Trainer, encounter_id: str) -> TrainerEncounter:        
+        entity = await self.repository.find_by(
+            trainer_id=trainer.id, pokemon_encounter_id=encounter_id
+        )
+        if not entity:
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.UPDATED,
+                user_id=trainer.user.id,
+                log_type=LogTypeEnum.ENCOUNTER,
+                status=LogStatusEnum.ERROR,
+                trainer_id=trainer.id,
+                message="Could not load encounters",
+            )
+
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail=f"{self.alias} not found",
+            )
+            
+            
+        trainer_encounters = await self._deactivate_all_encounters(trainer=trainer)
+        entity.is_active = True
+        entity_updated = await self.repository.update(entity=entity)
+
+        list_trainer_encounters: list[TrainerEncounter] = []
+        for trainer_encounter in trainer_encounters:
+            trainer_encounter.is_active = trainer_encounter.id == entity_updated.id
+            list_trainer_encounters.append(trainer_encounter)
+
+        await self.trainer_log.create(
+            event=TrainerLogEventEnum.UPDATED,
+            user_id=trainer.user.id,
+            log_type=LogTypeEnum.ENCOUNTER,
+            trainer_id=trainer.id,
+            trainer_encounters=list_trainer_encounters,
+        )
+
+        return entity_updated
+
+        
+        
+    async def _deactivate_all_encounters(self, trainer: Trainer) -> list[TrainerEncounter]:
+        list_entity = await self.list_all(
+            page_filter=FilterPage.build(trainer_id=trainer.id)
+        )
+        
+        trainer_encounters: list[TrainerEncounter] = []
+
+        for entity in list_entity:
+            entity.is_active = False
+            trainer_encounters.append(await self.repository.update(entity))
+        return trainer_encounters

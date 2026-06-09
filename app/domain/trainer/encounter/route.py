@@ -15,7 +15,10 @@ from app.models import Trainer
 from app.shared.schemas import FilterPage
 
 from app.domain.trainer.encounter.repository import TrainerEncounterRepository
-from app.domain.trainer.encounter.schema import TrainerEncounterSchema
+from app.domain.trainer.encounter.schema import (
+    TrainerEncounterSchema,
+    ActiveTrainerEncounterPayloadSchema,
+)
 from app.domain.trainer.encounter.service import TrainerEncounterService
 
 router = APIRouter()
@@ -35,16 +38,14 @@ def get_encounter_filter(
     page: int | None = None,
     offset: int | None = None,
     limit: int | None = 12,
-    name: str | None = None,
-    order: int | None = None,
+    pokemon_encounter_id: str | None = None,
     clean_cache: bool = False,
 ) -> FilterPage:
     return FilterPage.build(
         page=page,
         offset=offset,
         limit=limit,
-        name=name,
-        order=order,
+        pokemon_encounter_id=pokemon_encounter_id,
         clean_cache=clean_cache,
     )
 
@@ -74,4 +75,19 @@ async def find_one(param: str, service: Service, current_trainer: CurrentTrainer
         param=param,
         user_request=current_trainer.user.username,
         trainer_id=current_trainer.id,
+    )
+
+@router.put(
+    "/active",
+    response_model=TrainerEncounterSchema,
+    status_code=HTTPStatus.OK,
+)
+async def select_active(
+        payload: ActiveTrainerEncounterPayloadSchema,
+        service: Service,
+        current_trainer: CurrentTrainer,
+):
+    return await service.select_active(
+        trainer=current_trainer,
+        encounter_id=payload.encounter_id
     )

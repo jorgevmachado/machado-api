@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fastapi import HTTPException
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -13,7 +14,7 @@ def _build_trainer(known_encounters=None) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         known_encounters=known_encounters,
-        user=SimpleNamespace(id=uuid4()),
+        user=SimpleNamespace(id=uuid4(), username="ash"),
     )
 
 
@@ -198,3 +199,61 @@ async def test_update_list_returns_empty_when_no_encounters() -> None:
     )
 
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_select_active_returns_active_encounter() -> None:
+    trainer = _build_trainer()
+    previous_encounter_active = SimpleNamespace(id=uuid4(), is_active=True)
+    current_encounter_active = SimpleNamespace(id=uuid4(), is_active=False)
+    service = TrainerEncounterService(repository=AsyncMock(), trainer_log=AsyncMock())
+
+    service.repository.find_by = AsyncMock(return_value=current_encounter_active)
+    service._deactivate_all_encounters = AsyncMock(
+        return_value=[previous_encounter_active, current_encounter_active]
+    )
+
+    service.repository.update = AsyncMock(return_value=current_encounter_active)
+
+    result = await service.select_active(
+        trainer=trainer,
+        encounter_id=current_encounter_active.id,
+    )
+
+    assert result == current_encounter_active
+    service.repository.find_by.assert_awaited_once_with(
+        trainer_id=trainer.id,
+        pokemon_encounter_id=current_encounter_active.id,
+    )
+    service._deactivate_all_encounters.assert_awaited_once_with(trainer=trainer)
+    service.repository.update.assert_awaited_once_with(entity=current_encounter_active)
+    service.trainer_log.create.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_select_active_returns_throw() -> None:
+    trainer = _build_trainer()
+    service = TrainerEncounterService(repository=AsyncMock(), trainer_log=AsyncMock())
+    service.repository.find_by = AsyncMock(return_value=None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.select_active(trainer=trainer, encounter_id=uuid4())
+
+
+    assert exc_info.value.status_code == 404
+    service.trainer_log.create.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_deactivate_all_encounters_returns_all_inactive_encounters() -> None:
+    trainer = _build_trainer()
+    encounter_active = SimpleNamespace(id="encounter_active_one", is_active=True)
+
+    service = TrainerEncounterService(repository=AsyncMock(), trainer_log=AsyncMock())
+
+    service.list_all = AsyncMock(return_value=[encounter_active])
+
+    encounter_active.is_active = False
+    service.repository.update = AsyncMock(return_value=encounter_active)
+
+    result = await service._deactivate_all_encounters(trainer=trainer)
+
+    assert result == [encounter_active]

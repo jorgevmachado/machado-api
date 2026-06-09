@@ -34,3 +34,7 @@ class TrainerEncounterSchema(BaseModel):
             else schema.model_validate(value).model_dump(mode="json")
             for value in values
         ]
+
+
+class ActiveTrainerEncounterPayloadSchema(BaseModel):
+    encounter_id: str
