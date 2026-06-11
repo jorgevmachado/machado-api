@@ -105,7 +105,7 @@ class TestAuthService:
     @staticmethod
     @pytest.mark.asyncio
     async def test_login_returns_token_for_valid_user(monkeypatch):
-        user = SimpleNamespace(id=uuid4(), password="hashed")
+        user = SimpleNamespace(id=uuid4(), password="hashed", role="USER")
         repository = AsyncMock()
         repository.get_by_email_or_username.return_value = user
         monkeypatch.setattr("app.domain.auth.service.verify_password", lambda *_: True)
