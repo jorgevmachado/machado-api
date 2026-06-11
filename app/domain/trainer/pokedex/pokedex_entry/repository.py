@@ -8,6 +8,7 @@ from app.models import Pokemon, PokedexEntry, Type
 
 class PokedexEntryRepository(BaseRepository[PokedexEntry]):
     model = PokedexEntry
+    default_order_by = "discovered_at"
     relations = (
         selectinload(PokedexEntry.pokemon).selectinload(Pokemon.types),
         selectinload(PokedexEntry.pokemon).selectinload(Pokemon.evolutions),
