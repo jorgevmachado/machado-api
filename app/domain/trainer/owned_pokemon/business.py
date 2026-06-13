@@ -5,6 +5,7 @@ import unicodedata
 import random
 from math import floor
 
+
 def resolve_effective_nickname(pokemon_name: str, nickname: str | None) -> str:
     normalized = (nickname or "").strip()
     return normalized or pokemon_name
@@ -26,17 +27,19 @@ def build_unique_owned_name(base_slug: str, existing_pokemons: set[str]) -> str:
         suffix += 1
     return f"{base_slug}-{suffix}"
 
+
 def calculate_capture_chance_percent(
-        pokedex_hp: int,
-        pokedex_max_hp: int,
-        trainer_capture_rate: int,
-        pokemon_capture_rate: int
+    pokedex_hp: int,
+    pokedex_max_hp: int,
+    trainer_capture_rate: int,
+    pokemon_capture_rate: int,
 ) -> int:
     safe_max_hp = max(pokedex_max_hp, 1)
     hp_factor = 1 - (pokedex_hp / safe_max_hp)
     rate_advantage = max(0.0, (trainer_capture_rate - pokemon_capture_rate) / 255)
     chance = 15 + (hp_factor * 55) + (rate_advantage * 25)
     return max(15, min(95, floor(chance)))
+
 
 def rolled_capture_success(chance_percent: int) -> bool:
     return random.randint(1, 100) <= chance_percent

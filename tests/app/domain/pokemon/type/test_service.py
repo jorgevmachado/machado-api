@@ -83,12 +83,18 @@ class TestTypeService:
 
         assert result == [first, second]
         assert service.get_or_create.await_count == 2
-        service.get_or_create.assert_any_await(order=12, url="https://pokeapi.co/api/v2/type/12/")
-        service.get_or_create.assert_any_await(order=10, url="https://pokeapi.co/api/v2/type/10/")
+        service.get_or_create.assert_any_await(
+            order=12, url="https://pokeapi.co/api/v2/type/12/"
+        )
+        service.get_or_create.assert_any_await(
+            order=10, url="https://pokeapi.co/api/v2/type/10/"
+        )
 
     @staticmethod
     @pytest.mark.asyncio
-    async def test_sync_external_requires_order(type_repository_mock: AsyncMock) -> None:
+    async def test_sync_external_requires_order(
+        type_repository_mock: AsyncMock,
+    ) -> None:
         service = TypeService(repository=type_repository_mock, client=AsyncMock())
 
         with pytest.raises(ValueError, match="Order is required"):
@@ -146,7 +152,9 @@ class TestTypeService:
         client = AsyncMock()
         client.get_type.return_value = SimpleNamespace(
             name="grass",
-            move_damage_class=SimpleNamespace(url="https://pokeapi.co/api/v2/move-damage-class/3/"),
+            move_damage_class=SimpleNamespace(
+                url="https://pokeapi.co/api/v2/move-damage-class/3/"
+            ),
             sprites=SimpleNamespace(),
             damage_relations={"any": "value"},
         )
@@ -175,8 +183,16 @@ class TestTypeService:
         monkeypatch.setattr(
             "app.domain.pokemon.type.service.ensure_damage_relations",
             lambda _relations: SimpleNamespace(
-                strengths=[SimpleNamespace(name="fire", url="https://pokeapi.co/api/v2/type/10/")],
-                weaknesses=[SimpleNamespace(name="water", url="https://pokeapi.co/api/v2/type/11/")],
+                strengths=[
+                    SimpleNamespace(
+                        name="fire", url="https://pokeapi.co/api/v2/type/10/"
+                    )
+                ],
+                weaknesses=[
+                    SimpleNamespace(
+                        name="water", url="https://pokeapi.co/api/v2/type/11/"
+                    )
+                ],
             ),
         )
 
@@ -215,7 +231,9 @@ class TestTypeService:
         service = TypeService(repository=type_repository_mock, client=AsyncMock())
         service._sync_external = AsyncMock(return_value=synced)
 
-        result = await service.get_or_create(order=12, url="https://pokeapi.co/api/v2/type/12/")
+        result = await service.get_or_create(
+            order=12, url="https://pokeapi.co/api/v2/type/12/"
+        )
 
         assert result is synced
         service._sync_external.assert_awaited_once_with(
@@ -345,7 +363,9 @@ class TestTypeService:
         result = await service._sync_from_damages(
             [
                 SimpleNamespace(name="fire", url="https://pokeapi.co/api/v2/type/10/"),
-                SimpleNamespace(name="unknown", url="https://pokeapi.co/api/v2/type/0/"),
+                SimpleNamespace(
+                    name="unknown", url="https://pokeapi.co/api/v2/type/0/"
+                ),
             ]
         )
 

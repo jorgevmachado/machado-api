@@ -52,7 +52,9 @@ def _build_owned_pokemon() -> SimpleNamespace:
     )
 
 
-def _build_capture_payload(pokemon_name: str = 'bulbasaur', nickname: str | None = None) -> CapturePayloadSchema:
+def _build_capture_payload(
+    pokemon_name: str = "bulbasaur", nickname: str | None = None
+) -> CapturePayloadSchema:
     return CapturePayloadSchema(pokemon_name=pokemon_name, nickname=nickname)
 
 
@@ -239,7 +241,9 @@ async def test_onboard_returns_none_when_repository_save_returns_none(
     )
     user = SimpleNamespace(id=uuid4(), trainer=None, role=RoleEnum.USER)
 
-    with pytest.raises(AppHTTPException, match="Cannot onboard trainer, try again later!"):
+    with pytest.raises(
+        AppHTTPException, match="Cannot onboard trainer, try again later!"
+    ):
         await service.onboard(user, OnboardPayloadSchema(pokemon_name="bulbasaur"))
 
 
@@ -415,7 +419,9 @@ async def test_get_or_create_builds_trainer_with_admin_payload_values(
 
 
 @pytest.mark.asyncio
-async def test_capture_raises_when_user_has_no_trainer(trainer_session: AsyncMock) -> None:
+async def test_capture_raises_when_user_has_no_trainer(
+    trainer_session: AsyncMock,
+) -> None:
     repository = _build_repository(trainer_session)
     service = TrainerService(
         repository=repository,
@@ -431,11 +437,13 @@ async def test_capture_raises_when_user_has_no_trainer(trainer_session: AsyncMoc
         await service.capture(current_user=user, payload=_build_capture_payload())
 
     assert exc_info.value.status_code == 400
-    assert 'onboarded' in exc_info.value.detail
+    assert "onboarded" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
-async def test_capture_raises_when_trainer_has_no_pokeballs(trainer_session: AsyncMock) -> None:
+async def test_capture_raises_when_trainer_has_no_pokeballs(
+    trainer_session: AsyncMock,
+) -> None:
     trainer = _build_trainer_with_pokeballs(pokeballs=0)
     repository = _build_repository(trainer_session)
     service = TrainerService(
@@ -452,11 +460,13 @@ async def test_capture_raises_when_trainer_has_no_pokeballs(trainer_session: Asy
         await service.capture(current_user=user, payload=_build_capture_payload())
 
     assert exc_info.value.status_code == 400
-    assert 'pokeballs' in exc_info.value.detail
+    assert "pokeballs" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
-async def test_capture_decrements_pokeballs_and_returns_trainer(trainer_session: AsyncMock) -> None:
+async def test_capture_decrements_pokeballs_and_returns_trainer(
+    trainer_session: AsyncMock,
+) -> None:
     trainer = _build_trainer_with_pokeballs(pokeballs=3)
     updated_trainer = _build_trainer_with_pokeballs(pokeballs=2)
     updated_trainer.id = trainer.id
@@ -495,22 +505,22 @@ async def test_capture_decrements_pokeballs_and_returns_trainer(trainer_session:
     user = SimpleNamespace(id=uuid4(), trainer=trainer, role=RoleEnum.USER)
     result = await service.capture(
         current_user=user,
-        payload=_build_capture_payload(pokemon_name='bulbasaur', nickname='Bulba'),
+        payload=_build_capture_payload(pokemon_name="bulbasaur", nickname="Bulba"),
     )
 
     assert result is fresh_trainer
     assert trainer.pokeballs == 2
     repository.update.assert_awaited_once_with(trainer)
     pokedex_service.discover.assert_awaited_once_with(
-        name='bulbasaur',
+        name="bulbasaur",
         trainer=updated_trainer,
         without_throw=True,
     )
     owned_pokemon_service.create.assert_awaited_once_with(
-        nickname='Bulba',
+        nickname="Bulba",
         trainer=updated_trainer,
         pokedex_hp=pokedex_entry.hp,
-        pokemon_name='bulbasaur',
+        pokemon_name="bulbasaur",
         pokedex_max_hp=pokedex_entry.max_hp,
         trainer_capture_rate=updated_trainer.capture_rate,
     )
@@ -522,7 +532,9 @@ async def test_capture_decrements_pokeballs_and_returns_trainer(trainer_session:
 
 
 @pytest.mark.asyncio
-async def test_capture_returns_reloaded_trainer_after_all_operations(trainer_session: AsyncMock) -> None:
+async def test_capture_returns_reloaded_trainer_after_all_operations(
+    trainer_session: AsyncMock,
+) -> None:
     trainer = _build_trainer_with_pokeballs(pokeballs=1)
     updated_trainer = SimpleNamespace(id=trainer.id, pokeballs=0, capture_rate=75)
     fresh_trainer = SimpleNamespace(id=trainer.id, pokeballs=0)
@@ -556,3 +568,187 @@ async def test_capture_returns_reloaded_trainer_after_all_operations(trainer_ses
     )
 
     assert result is fresh_trainer
+
+
+# ── explore ───────────────────────────────────────────────────────────────────
+
+
+def _build_service_for_explore(
+    trainer_session,
+    *,
+    battle_service=None,
+    exploration_service=None,
+    trainer_encounter_service=None,
+    trainer_party_service=None,
+):
+    repository = _build_repository(trainer_session)
+    return TrainerService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+        pokemon_service=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        trainer_encounter_service=trainer_encounter_service or AsyncMock(),
+        trainer_party_service=trainer_party_service or AsyncMock(),
+        battle_service=battle_service or AsyncMock(),
+        exploration_service=exploration_service or AsyncMock(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_explore_raises_when_trainer_not_onboarded(
+    trainer_session: AsyncMock,
+) -> None:
+    service = _build_service_for_explore(trainer_session)
+    user = SimpleNamespace(id=uuid4(), trainer=None, role=RoleEnum.USER)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.explore(current_user=user)
+
+    assert exc_info.value.status_code == 400
+    assert "onboarded" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_explore_raises_when_active_battle_exists(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    battle_service = AsyncMock()
+    battle_service.find_by = AsyncMock(return_value=SimpleNamespace(id=uuid4()))
+
+    service = _build_service_for_explore(trainer_session, battle_service=battle_service)
+    user = SimpleNamespace(id=uuid4(), trainer=trainer, role=RoleEnum.USER)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.explore(current_user=user)
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_explore_raises_when_no_active_encounter(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    battle_service = AsyncMock()
+    battle_service.find_by = AsyncMock(return_value=None)
+    encounter_service = AsyncMock()
+    encounter_service.active = AsyncMock(return_value=None)
+
+    service = _build_service_for_explore(
+        trainer_session,
+        battle_service=battle_service,
+        trainer_encounter_service=encounter_service,
+    )
+    user = SimpleNamespace(id=uuid4(), trainer=trainer, role=RoleEnum.USER)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.explore(current_user=user)
+
+    assert exc_info.value.status_code == 400
+    assert "encounter" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_explore_returns_exploration_result_for_wild_pokemon_event(
+    trainer_session: AsyncMock,
+) -> None:
+    from app.models import ExplorationEventTypeEnum
+
+    trainer = SimpleNamespace(id=uuid4(), pokeballs=5, user=SimpleNamespace(id=uuid4()))
+    owned_pokemon = SimpleNamespace(id=uuid4(), name="charmander")
+    party = SimpleNamespace(owned_pokemon=owned_pokemon)
+
+    exploration_event = SimpleNamespace(
+        id=uuid4(),
+        event_type=ExplorationEventTypeEnum.WILD_POKEMON,
+        payload={"wild_pokemon_name": "pidgey", "wild_pokemon_id": str(uuid4())},
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        status="ACTIVE",
+    )
+    updated_event = SimpleNamespace(
+        id=exploration_event.id,
+        event_type=ExplorationEventTypeEnum.WILD_POKEMON,
+        payload={**exploration_event.payload, "has_active_battle": True},
+    )
+
+    battle_service = AsyncMock()
+    battle_service.find_by = AsyncMock(return_value=None)
+    battle_service.create_or_resume = AsyncMock(return_value=battle_session)
+
+    exploration_service = AsyncMock()
+    exploration_service.exploration = AsyncMock(return_value=exploration_event)
+    exploration_service.update_result = AsyncMock(return_value=updated_event)
+
+    encounter_service = AsyncMock()
+    encounter_service.active = AsyncMock(return_value=SimpleNamespace(id=uuid4()))
+
+    party_service = AsyncMock()
+    party_service.ready_to_battle = AsyncMock(return_value=party)
+
+    service = _build_service_for_explore(
+        trainer_session,
+        battle_service=battle_service,
+        exploration_service=exploration_service,
+        trainer_encounter_service=encounter_service,
+        trainer_party_service=party_service,
+    )
+    service.cache_service = AsyncMock()
+    service.cache_service.delete_domain = AsyncMock()
+
+    user = SimpleNamespace(id=uuid4(), trainer=trainer, role=RoleEnum.USER)
+    result = await service.explore(current_user=user)
+
+    assert result is updated_event
+    battle_service.create_or_resume.assert_awaited_once()
+    exploration_service.update_result.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_explore_updates_pokeballs_for_pokeball_event(
+    trainer_session: AsyncMock,
+) -> None:
+    from app.models import ExplorationEventTypeEnum
+
+    trainer = SimpleNamespace(id=uuid4(), pokeballs=5, user=SimpleNamespace(id=uuid4()))
+
+    exploration_event = SimpleNamespace(
+        id=uuid4(),
+        event_type=ExplorationEventTypeEnum.POKEBALLS,
+        payload={"trainer_pokeballs": 8, "pokeballs_found": 3},
+    )
+
+    battle_service = AsyncMock()
+    battle_service.find_by = AsyncMock(return_value=None)
+
+    exploration_service = AsyncMock()
+    exploration_service.exploration = AsyncMock(return_value=exploration_event)
+
+    encounter_service = AsyncMock()
+    encounter_service.active = AsyncMock(return_value=SimpleNamespace(id=uuid4()))
+
+    repository = _build_repository(trainer_session)
+    repository.update = AsyncMock(return_value=trainer)
+
+    service = TrainerService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+        pokemon_service=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        trainer_encounter_service=encounter_service,
+        trainer_party_service=AsyncMock(),
+        battle_service=battle_service,
+        exploration_service=exploration_service,
+    )
+    service.cache_service = AsyncMock()
+    service.cache_service.delete_domain = AsyncMock()
+
+    user = SimpleNamespace(id=uuid4(), trainer=trainer, role=RoleEnum.USER)
+    await service.explore(current_user=user)
+
+    repository.update.assert_awaited()
+    assert trainer.pokeballs == 8

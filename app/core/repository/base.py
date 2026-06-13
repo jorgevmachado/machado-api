@@ -260,7 +260,7 @@ class BaseRepository[ModelT]:
         return entity
 
     async def update(self, entity: ModelT) -> ModelT:
-        await self.session.merge(entity)
+        entity = await self.session.merge(entity)
         await self.session.commit()
         await self.session.refresh(entity)
         return entity

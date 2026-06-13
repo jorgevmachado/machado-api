@@ -54,6 +54,7 @@ class Move:
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="moves",
     )
     owned_pokemon_moves: Mapped[list["OwnedPokemonMove"]] = relationship(
         lazy=default_lazy,

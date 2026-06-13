@@ -22,9 +22,7 @@ def test_get_trainer_encounter_service_builds_service() -> None:
 
 
 def test_get_encounter_filter_builds_filter() -> None:
-    page_filter = get_encounter_filter(
-        page=1, offset=1, limit=10
-    )
+    page_filter = get_encounter_filter(page=1, offset=1, limit=10)
     assert page_filter.page == 1
     assert page_filter.offset == 1
     assert page_filter.limit == 10
@@ -62,21 +60,20 @@ async def test_find_one_delegates_to_service(current_trainer: SimpleNamespace) -
         trainer_id=current_trainer.id,
     )
 
+
 @pytest.mark.asyncio
 async def test_select_active(current_trainer: SimpleNamespace) -> None:
     payload = ActiveTrainerEncounterPayloadSchema(encounter_id="encounter-id")
     trainer_encounter = SimpleNamespace(id="encounter-id", is_active=True)
     service = AsyncMock()
     service.select_active.return_value = trainer_encounter
-    
+
     result = await select_active(
-        payload=payload,
-        service=service,
-        current_trainer=current_trainer
+        payload=payload, service=service, current_trainer=current_trainer
     )
 
     assert result is trainer_encounter
-    
+
     service.select_active.assert_awaited_once_with(
         trainer=current_trainer,
         encounter_id=payload.encounter_id,

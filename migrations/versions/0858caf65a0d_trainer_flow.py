@@ -47,6 +47,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_trainers_user_id", "trainers", ["user_id"])
     op.create_table(
         "owned_pokemons",
         sa.Column("name", sa.String(), nullable=False),
@@ -77,6 +78,13 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_owned_pokemons_trainer_id", "owned_pokemons", ["trainer_id"])
+    op.create_index("ix_owned_pokemons_pokemon_id", "owned_pokemons", ["pokemon_id"])
+    op.create_index(
+        "ix_owned_pokemons_trainer_name",
+        "owned_pokemons",
+        ["trainer_id", "name"],
+    )
     op.create_table(
         "pokedex",
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
@@ -90,6 +98,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_pokedex_trainer_id", "pokedex", ["trainer_id"])
     op.create_table(
         "trainer_encounters",
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
@@ -108,6 +117,19 @@ def upgrade() -> None:
             ["trainers.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_trainer_encounters_trainer_id", "trainer_encounters", ["trainer_id"]
+    )
+    op.create_index(
+        "ix_trainer_encounters_trainer_active",
+        "trainer_encounters",
+        ["trainer_id", "is_active"],
+    )
+    op.create_index(
+        "ix_trainer_encounters_trainer_encounter",
+        "trainer_encounters",
+        ["trainer_id", "pokemon_encounter_id"],
     )
     op.create_table(
         "owned_pokemon_moves",
@@ -128,6 +150,16 @@ def upgrade() -> None:
             ["moves.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_owned_pokemon_moves_owned_pokemon_id",
+        "owned_pokemon_moves",
+        ["owned_pokemon_id"],
+    )
+    op.create_index(
+        "ix_owned_pokemon_moves_pokemon_move_id",
+        "owned_pokemon_moves",
+        ["pokemon_move_id"],
     )
     op.create_table(
         "pokedex_entries",
@@ -159,6 +191,17 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_pokedex_entries_pokedex_id", "pokedex_entries", ["pokedex_id"])
+    op.create_index(
+        "ix_pokedex_entries_pokedex_pokemon",
+        "pokedex_entries",
+        ["pokedex_id", "pokemon_id"],
+    )
+    op.create_index(
+        "ix_pokedex_entries_pokedex_discovered",
+        "pokedex_entries",
+        ["pokedex_id", "discovered_at"],
+    )
     op.create_table(
         "trainer_parties",
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
@@ -178,6 +221,17 @@ def upgrade() -> None:
             ["trainers.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("ix_trainer_parties_trainer_id", "trainer_parties", ["trainer_id"])
+    op.create_index(
+        "ix_trainer_parties_trainer_owned_pokemon",
+        "trainer_parties",
+        ["trainer_id", "owned_pokemon_id"],
+    )
+    op.create_index(
+        "ix_trainer_parties_trainer_slot",
+        "trainer_parties",
+        ["trainer_id", "slot"],
     )
     # ### end Alembic commands ###
 

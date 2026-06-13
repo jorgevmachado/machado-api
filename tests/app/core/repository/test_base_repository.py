@@ -470,10 +470,10 @@ class TestBaseRepositoryPersist:
         repository = PokemonBaseRepository(session=mock_session)
         result = await repository.update(entity)
 
-        assert result is entity
+        assert result is merged_entity
         mock_session.merge.assert_awaited_once_with(entity)
         mock_session.commit.assert_awaited_once()
-        mock_session.refresh.assert_awaited_once_with(entity)
+        mock_session.refresh.assert_awaited_once_with(merged_entity)
 
 
 class TestBaseRepositoryListAll:

@@ -38,5 +38,9 @@ class GrowthRate:
     )
 
     pokemons: Mapped[list["Pokemon"]] = relationship(
-        lazy=default_lazy, default_factory=list, init=False, repr=False
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="growth_rate",
     )

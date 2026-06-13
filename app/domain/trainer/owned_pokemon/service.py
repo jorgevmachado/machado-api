@@ -29,7 +29,8 @@ from app.models import (
     TrainerLogEventEnum,
     LogTypeEnum,
     Trainer,
-    LogStatusEnum, Pokemon,
+    LogStatusEnum,
+    Pokemon,
 )
 from app.shared.schemas import FilterPage
 
@@ -109,7 +110,7 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
                     status_code=HTTPStatus.NOT_FOUND,
                     detail=message,
                 )
-            
+
             await self.validate_capture_rate(
                 trainer=trainer,
                 pokemon=pokemon,
@@ -204,7 +205,7 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
         await self.pokemon_service.list_all_cached(
             page_filter=FilterPage.build(page=1, limit=1)
         )
-        
+
         crated_owned_pokemon = await self.create(
             commit=commit,
             trainer=trainer,
@@ -213,18 +214,15 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
             only_allowed_pokemon=only_allowed_pokemon,
         )
 
-        
-        
         return crated_owned_pokemon
 
-
     async def validate_capture_rate(
-            self,
-            trainer: Trainer,
-            pokemon: Pokemon,
-            pokedex_hp: int | None,
-            pokedex_max_hp: int | None,
-            trainer_capture_rate: int | None
+        self,
+        trainer: Trainer,
+        pokemon: Pokemon,
+        pokedex_hp: int | None,
+        pokedex_max_hp: int | None,
+        trainer_capture_rate: int | None,
     ) -> None:
 
         if not trainer_capture_rate or not pokedex_hp or not pokedex_max_hp:
@@ -243,7 +241,7 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
             )
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
-                detail= message,
+                detail=message,
             )
 
         capture_chance_percent = calculate_capture_chance_percent(

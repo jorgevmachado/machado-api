@@ -77,17 +77,17 @@ async def find_one(param: str, service: Service, current_trainer: CurrentTrainer
         trainer_id=current_trainer.id,
     )
 
+
 @router.put(
     "/active",
     response_model=TrainerEncounterSchema,
     status_code=HTTPStatus.OK,
 )
 async def select_active(
-        payload: ActiveTrainerEncounterPayloadSchema,
-        service: Service,
-        current_trainer: CurrentTrainer,
+    payload: ActiveTrainerEncounterPayloadSchema,
+    service: Service,
+    current_trainer: CurrentTrainer,
 ):
     return await service.select_active(
-        trainer=current_trainer,
-        encounter_id=payload.encounter_id
+        trainer=current_trainer, encounter_id=payload.encounter_id
     )

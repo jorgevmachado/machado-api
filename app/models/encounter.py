@@ -49,6 +49,7 @@ class Encounter:
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="encounters",
     )
     trainer_encounters: Mapped[list["TrainerEncounter"]] = relationship(
         lazy=default_lazy,

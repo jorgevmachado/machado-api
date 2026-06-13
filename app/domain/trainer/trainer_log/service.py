@@ -70,7 +70,6 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
         pokedex: Pokedex | None = None,
         trainer_parties: list[TrainerParty] | None = None,
         trainer_encounters: list[TrainerEncounter] | None = None,
-            
         owned_pokemon: OwnedPokemon | None = None,
     ) -> TrainerLog:
         current_payload = {"user_id": str(user_id), **(payload or {})}
@@ -96,46 +95,58 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
                 entity.payload = {
                     "name": owned_pokemon.pokemon.name,
                     "nickname": owned_pokemon.nickname,
-                    "captured_at": owned_pokemon.captured_at.isoformat() if owned_pokemon.captured_at else None,
+                    "captured_at": owned_pokemon.captured_at.isoformat()
+                    if owned_pokemon.captured_at
+                    else None,
                     **current_payload,
                 }
-            
+
         if log_type == LogTypeEnum.POKEDEX:
             if not status:
                 status = LogStatusEnum.SUCCESS if pokedex else LogStatusEnum.ERROR
             entity.status = status
             if pokedex:
                 entries = pokedex.entries
-                selected = next(
-                    (item for item in entries if item.discovered), None
-                )
+                selected = next((item for item in entries if item.discovered), None)
                 entity.payload = {
                     "total": len(entries),
                     "pokedex_id": str(pokedex.id),
                     "pokemon_name": selected.name if selected else None,
-                    "discovered_at": selected.discovered_at.isoformat() if selected else None,
+                    "discovered_at": selected.discovered_at.isoformat()
+                    if selected
+                    else None,
                     **current_payload,
                 }
-                
+
         if log_type == LogTypeEnum.ENCOUNTER:
             if not status:
-                status = LogStatusEnum.SUCCESS if trainer_encounters else LogStatusEnum.ERROR
+                status = (
+                    LogStatusEnum.SUCCESS if trainer_encounters else LogStatusEnum.ERROR
+                )
             entity.status = status
             if trainer_encounters:
-                selected = next((item for item in trainer_encounters if item.is_active), None)
+                selected = next(
+                    (item for item in trainer_encounters if item.is_active), None
+                )
                 entity.payload = {
                     "total": len(trainer_encounters),
-                    "active_encounter": str(selected.pokemon_encounter_id) if selected else None,
+                    "active_encounter": str(selected.pokemon_encounter_id)
+                    if selected
+                    else None,
                     **current_payload,
                 }
 
         if log_type == LogTypeEnum.PARTY:
             if not status:
-                status = LogStatusEnum.SUCCESS if trainer_parties else LogStatusEnum.ERROR
+                status = (
+                    LogStatusEnum.SUCCESS if trainer_parties else LogStatusEnum.ERROR
+                )
             entity.status = status
             if trainer_parties:
                 active_pokemons = [
-                    item.owned_pokemon.name if item.owned_pokemon else str(item.owned_pokemon_id)
+                    item.owned_pokemon.name
+                    if item.owned_pokemon
+                    else str(item.owned_pokemon_id)
                     for item in trainer_parties
                     if item.is_active
                 ]
@@ -146,7 +157,9 @@ class TrainerLogService(BaseService[TrainerLogRepository, TrainerLog]):
                 }
 
         if not message:
-            status_message = 'error' if status == LogStatusEnum.ERROR else 'successfully'
+            status_message = (
+                "error" if status == LogStatusEnum.ERROR else "successfully"
+            )
             message = f"{log_type} {event} {status_message}"
         entity.message = message
 

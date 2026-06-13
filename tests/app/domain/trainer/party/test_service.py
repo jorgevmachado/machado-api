@@ -59,7 +59,10 @@ async def test_add_uses_paginated_items_and_saves_new_slot(
 ) -> None:
     trainer = _build_trainer()
     repository = _build_repository(trainer_session)
-    repository.list_all.side_effect = [SimpleNamespace(items=[SimpleNamespace(id=uuid4())]), ["updated"]]
+    repository.list_all.side_effect = [
+        SimpleNamespace(items=[SimpleNamespace(id=uuid4())]),
+        ["updated"],
+    ]
     repository.find_by.return_value = None
     service = TrainerPartyService(repository=repository, trainer_log=AsyncMock())
     owned_pokemon = SimpleNamespace(id=uuid4())
@@ -125,7 +128,9 @@ async def test_get_or_create_list_returns_given_party_slots(
 ) -> None:
     party_slots = [SimpleNamespace(id=uuid4())]
     trainer = _build_trainer(party_slots=party_slots)
-    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
 
     result = await service.get_or_create_list(
         trainer=trainer,
@@ -141,7 +146,9 @@ async def test_get_or_create_list_returns_existing_party_slots_from_list_all(
 ) -> None:
     existing = [SimpleNamespace(id=uuid4())]
     trainer = _build_trainer(party_slots=None)
-    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
     service.list_all = AsyncMock(return_value=existing)
 
     result = await service.get_or_create_list(
@@ -157,7 +164,9 @@ async def test_get_or_create_list_returns_empty_when_owned_pokemon_is_missing(
     trainer_session: AsyncMock,
 ) -> None:
     trainer = _build_trainer(party_slots=None)
-    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
     service.list_all = AsyncMock(return_value=[])
     service.add = AsyncMock()
 
@@ -177,7 +186,9 @@ async def test_get_or_create_list_delegates_to_add_when_needed(
     expected = [SimpleNamespace(id=uuid4())]
     owned_pokemon = SimpleNamespace(id=uuid4())
     trainer = _build_trainer(party_slots=[])
-    service = TrainerPartyService(repository=_build_repository(trainer_session), trainer_log=AsyncMock())
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
     service.list_all = AsyncMock(return_value=[])
     service.add = AsyncMock(return_value=expected)
 
@@ -192,3 +203,61 @@ async def test_get_or_create_list_delegates_to_add_when_needed(
         owned_pokemon=owned_pokemon,
         without_throw=True,
     )
+
+
+# ── ready_to_battle ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ready_to_battle_raises_when_no_parties(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer.user = SimpleNamespace(id=uuid4())
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
+    service.list_all = AsyncMock(return_value=[])
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.ready_to_battle(trainer=trainer)
+
+    assert exc_info.value.status_code == 400
+    assert "no active party" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_ready_to_battle_returns_first_pokemon_with_hp(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    fainted = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=0))
+    alive = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=35))
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
+    service.list_all = AsyncMock(return_value=[fainted, alive])
+
+    result = await service.ready_to_battle(trainer=trainer)
+
+    assert result is alive
+
+
+@pytest.mark.asyncio
+async def test_ready_to_battle_raises_when_all_pokemon_fainted(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer.user = SimpleNamespace(id=uuid4())
+    fainted1 = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=0))
+    fainted2 = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=0))
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session), trainer_log=AsyncMock()
+    )
+    service.list_all = AsyncMock(return_value=[fainted1, fainted2])
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.ready_to_battle(trainer=trainer)
+
+    assert exc_info.value.status_code == 400
+    assert "battle-ready" in exc_info.value.detail

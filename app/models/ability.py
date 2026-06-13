@@ -45,5 +45,5 @@ class Ability:
         default_factory=list,
         init=False,
         repr=False,
-        overlaps="ability,ability_links",
+        back_populates="abilities",
     )

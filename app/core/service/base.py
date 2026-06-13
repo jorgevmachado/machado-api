@@ -159,6 +159,7 @@ class BaseService[
     async def find_by(self, **kwargs):
         user_request = kwargs.get("user_request", None)
         without_throw = kwargs.get("without_throw", False)
+        kwargs.pop("without_throw", None)
         try:
             result = await self.repository.find_by(**kwargs)
             if result is None and not without_throw:

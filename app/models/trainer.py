@@ -4,13 +4,15 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer,Enum as SAEnum
+from sqlalchemy import DateTime, ForeignKey, Integer, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import default_lazy, table_registry
 from app.models import PokemonStatusEnum, utcnow
 
 if TYPE_CHECKING:
+    from app.models.battle_session import BattleSession
+    from app.models.exploration_event import ExplorationEvent
     from app.models.user import User
     from app.models.owned_pokemon import OwnedPokemon
     from app.models.pokedex import Pokedex
@@ -56,6 +58,14 @@ class Trainer:
         repr=False,
         back_populates="trainer",
     )
+    exploration_events: Mapped[list["ExplorationEvent"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="trainer",
+    )
+
     pokedex: Mapped["Pokedex"] = relationship(
         lazy=default_lazy,
         init=False,
@@ -78,5 +88,13 @@ class Trainer:
     user: Mapped["User"] = relationship(
         init=False,
         lazy=default_lazy,
+        back_populates="trainer",
+    )
+
+    battle_sessions: Mapped[list["BattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
         back_populates="trainer",
     )

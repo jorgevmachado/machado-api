@@ -36,7 +36,7 @@ def upgrade() -> None:
                 """)
     op.execute("""
                         DO $$ BEGIN
-                            CREATE TYPE trainerlogeventenum AS ENUM ('WON', 'LOST', 'FLEE', 'SHOWN', 'POKEDEX_CREATED', 'MOVED', 'CREATED', 'UPDATED', 'DELETED', 'CAPTURED', 'DISCOVERED');
+                            CREATE TYPE trainerlogeventenum AS ENUM ('WON', 'LOST', 'FLEE', 'SHOWN', 'MOVED', 'CREATED', 'UPDATED', 'DELETED', 'EXPLORED', 'CAPTURED', 'DISCOVERED');
                         EXCEPTION
                             WHEN duplicate_object THEN null;
                         END $$;
@@ -81,11 +81,11 @@ def upgrade() -> None:
                 "LOST",
                 "FLEE",
                 "SHOWN",
-                "POKEDEX_CREATED",
                 "MOVED",
                 "CREATED",
                 "UPDATED",
                 "DELETED",
+                "EXPLORED",
                 "CAPTURED",
                 "DISCOVERED",
                 name="trainerlogeventenum",
@@ -103,6 +103,11 @@ def upgrade() -> None:
             ["trainers.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_trainer_logs_trainer_created",
+        "trainer_logs",
+        ["trainer_id", "created_at"],
     )
     # ### end Alembic commands ###
 

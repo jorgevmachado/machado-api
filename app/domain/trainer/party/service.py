@@ -77,7 +77,9 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
             return entity_list
 
         if len(party_list) >= MAX_PARTY_SIZE:
-            message = f"Trainer {trainer.id} already have {MAX_PARTY_SIZE} pokemon in party"
+            message = (
+                f"Trainer {trainer.id} already have {MAX_PARTY_SIZE} pokemon in party"
+            )
             await self.trainer_log.create(
                 event=TrainerLogEventEnum.CREATED,
                 user_id=trainer.user.id,
@@ -145,4 +147,37 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
 
         return await self.add(
             trainer=trainer, owned_pokemon=owned_pokemon, without_throw=True
+        )
+
+    async def ready_to_battle(self, trainer: Trainer) -> TrainerParty:
+        parties = await self.list_all(
+            page_filter=FilterPage.build(trainer_id=trainer.id, is_active=True)
+        )
+
+        if not parties:
+            await self.trainer_log.create(
+                status=LogStatusEnum.ERROR,
+                event=TrainerLogEventEnum.SHOWN,
+                user_id=trainer.user.id,
+                message="Trainer has no active party for battle",
+                log_type=LogTypeEnum.PARTY,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Trainer has no active party for battle",
+            )
+
+        for party in parties:
+            if party.owned_pokemon.hp > 0:
+                return party
+        await self.trainer_log.create(
+            status=LogStatusEnum.ERROR,
+            event=TrainerLogEventEnum.SHOWN,
+            user_id=trainer.user.id,
+            message="Trainer has no battle-ready Pokemon",
+            log_type=LogTypeEnum.PARTY,
+        )
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Trainer has no battle-ready Pokemon",
         )

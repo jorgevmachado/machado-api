@@ -72,7 +72,7 @@ class AuthService:
                 )
 
             await self.repository.update_auth_success(user.id)
-            token = create_access_token({"sub": str(user.id), "role": user.role })
+            token = create_access_token({"sub": str(user.id), "role": user.role})
 
             return LoginResponseSchema(access_token=token)
 

@@ -109,7 +109,7 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         self,
         param: str,
         **kwargs,
-    ) -> PokedexEntry | None:
+    ) -> PokedexEntry:
         cache_key = param
         pokedex_id = kwargs.get("pokedex_id") if kwargs else None
         pokedex_id = cast(str, pokedex_id) if pokedex_id else None
@@ -128,9 +128,9 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         return item
 
     async def _sync_pokemon(
-            self,
-            param: str,
-            **kwargs,
+        self,
+        param: str,
+        **kwargs,
     ) -> PokedexEntry:
 
         entity = await self.find_one(param, **kwargs)
@@ -150,7 +150,9 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
                 return await self.repository.update(entity=entity)
         return entity
 
-    async def discover(self, pokedex_id: str, trainer: Trainer, name: str, without_throw: bool = False) -> PokedexEntry:
+    async def discover(
+        self, pokedex_id: str, trainer: Trainer, name: str, without_throw: bool = False
+    ) -> PokedexEntry:
 
         entity = await self._sync_pokemon(param=name, pokedex_id=pokedex_id)
         if entity.discovered:
@@ -176,7 +178,9 @@ class PokedexEntryService(BaseService[PokedexEntryRepository, PokedexEntry]):
         await self.trainer_log.create(
             event=TrainerLogEventEnum.DISCOVERED,
             user_id=trainer.user.id,
-            status=LogStatusEnum.SUCCESS if updated_pokedex_entry else LogStatusEnum.ERROR,
+            status=LogStatusEnum.SUCCESS
+            if updated_pokedex_entry
+            else LogStatusEnum.ERROR,
             log_type=LogTypeEnum.POKEDEX,
             trainer_id=trainer.id,
         )

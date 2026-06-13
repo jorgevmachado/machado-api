@@ -327,18 +327,19 @@ async def test_discover_delegates_to_pokedex_entry_service(
         pokemon_service=AsyncMock(),
         pokedex_entry_service=pokedex_entry_service,
     )
-    service.get_by = AsyncMock(return_value='pokedex-id')
+    service.get_by = AsyncMock(return_value="pokedex-id")
     trainer_id = uuid4()
     trainer = SimpleNamespace(id=trainer_id)
 
-    result = await service.discover(trainer=trainer, name='bulbasaur', without_throw=True)
+    result = await service.discover(
+        trainer=trainer, name="bulbasaur", without_throw=True
+    )
 
     assert result is entry
     service.get_by.assert_awaited_once_with(trainer_id=str(trainer_id))
     pokedex_entry_service.discover.assert_awaited_once_with(
-        name='bulbasaur',
+        name="bulbasaur",
         trainer=trainer,
-        pokedex_id='pokedex-id',
+        pokedex_id="pokedex-id",
         without_throw=True,
     )
-

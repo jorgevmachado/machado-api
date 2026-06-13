@@ -51,8 +51,7 @@ def get_trainer_log_filter(
 
 @router.get(
     "",
-    response_model=CustomLimitOffsetPage[TrainerLogSchema]
-    | list[TrainerLogSchema],
+    response_model=CustomLimitOffsetPage[TrainerLogSchema] | list[TrainerLogSchema],
     status_code=HTTPStatus.OK,
 )
 async def list_all(

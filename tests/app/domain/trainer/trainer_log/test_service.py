@@ -33,6 +33,7 @@ def _build_service() -> TrainerLogService:
 
 # --- _serialize_value tests ---
 
+
 def test_serialize_value_converts_uuid_to_string() -> None:
     uid = uuid4()
     result = _serialize_value(uid)
@@ -60,12 +61,14 @@ def test_serialize_value_returns_plain_values_unchanged() -> None:
 
 # --- from_session ---
 
+
 def test_from_session_builds_service() -> None:
     service = TrainerLogService.from_session(AsyncMock())
     assert isinstance(service, TrainerLogService)
 
 
 # --- create() for TRAINER type ---
+
 
 @pytest.mark.asyncio
 async def test_create_trainer_log_success_with_trainer_id() -> None:
@@ -97,6 +100,7 @@ async def test_create_trainer_log_error_without_trainer_id() -> None:
 
 
 # --- create() for POKEMON type ---
+
 
 @pytest.mark.asyncio
 async def test_create_pokemon_log_with_owned_pokemon() -> None:
@@ -135,11 +139,14 @@ async def test_create_pokemon_log_without_owned_pokemon() -> None:
 
 # --- create() for POKEDEX type ---
 
+
 @pytest.mark.asyncio
 async def test_create_pokedex_log_with_discovered_entry() -> None:
     service = _build_service()
     discovered_at = datetime(2024, 3, 1, tzinfo=timezone.utc)
-    entry = SimpleNamespace(discovered=True, name="bulbasaur", discovered_at=discovered_at)
+    entry = SimpleNamespace(
+        discovered=True, name="bulbasaur", discovered_at=discovered_at
+    )
     pokedex = SimpleNamespace(id=uuid4(), entries=[entry])
 
     entity = await service.create(
@@ -188,6 +195,7 @@ async def test_create_pokedex_log_without_pokedex() -> None:
 
 # --- create() for ENCOUNTER type ---
 
+
 @pytest.mark.asyncio
 async def test_create_encounter_log_with_active_encounter() -> None:
     service = _build_service()
@@ -223,6 +231,7 @@ async def test_create_encounter_log_without_encounters() -> None:
 
 
 # --- create() for PARTY type ---
+
 
 @pytest.mark.asyncio
 async def test_create_party_log_with_active_parties() -> None:
@@ -267,6 +276,7 @@ async def test_create_party_log_without_parties() -> None:
 
 # --- custom message ---
 
+
 @pytest.mark.asyncio
 async def test_create_uses_custom_message_when_provided() -> None:
     service = _build_service()
@@ -282,6 +292,7 @@ async def test_create_uses_custom_message_when_provided() -> None:
 
 
 # --- payload with UUID value is serialized ---
+
 
 @pytest.mark.asyncio
 async def test_create_serializes_uuid_in_custom_payload() -> None:

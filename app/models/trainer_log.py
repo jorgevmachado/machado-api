@@ -15,14 +15,14 @@ from app.models.common import utcnow
 
 @table_registry.mapped_as_dataclass
 class TrainerLog:
-    __tablename__ = "trainer_logs"    
+    __tablename__ = "trainer_logs"
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True, default_factory=uuid4, init=False
     )
     type: Mapped[LogTypeEnum] = mapped_column(
         SAEnum(LogTypeEnum, name="logtypeenum"), nullable=False
-    ) 
+    )
     status: Mapped[LogStatusEnum] = mapped_column(
         SAEnum(LogStatusEnum, name="logstatusenum"), nullable=False
     )
@@ -30,8 +30,10 @@ class TrainerLog:
         SAEnum(TrainerLogEventEnum, name="trainerlogeventenum"), nullable=False
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default_factory=dict)
-    
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default_factory=dict
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default_factory=utcnow, init=False
     )

@@ -281,9 +281,7 @@ class TestPokemonService:
             )
         )
         pokemon_service.client.get_pokemon_encounters = AsyncMock(return_value=[])
-        pokemon_service.type_service.sync_from_resources = AsyncMock(
-            return_value=[SimpleNamespace(name="grass")]
-        )
+        pokemon_service.type_service.sync_from_resources = AsyncMock(return_value=[])
         pokemon_service.shape_service.sync_from_resource = AsyncMock(
             return_value=SimpleNamespace(id=uuid4())
         )
@@ -296,12 +294,8 @@ class TestPokemonService:
         pokemon_service.growth_rate_service.sync_from_resource = AsyncMock(
             return_value=SimpleNamespace(id=uuid4())
         )
-        pokemon_service.move_service.sync_from_resources = AsyncMock(
-            return_value=[SimpleNamespace(name="tackle")]
-        )
-        pokemon_service.ability_service.sync_from_resources = AsyncMock(
-            return_value=[SimpleNamespace(name="overgrow")]
-        )
+        pokemon_service.move_service.sync_from_resources = AsyncMock(return_value=[])
+        pokemon_service.ability_service.sync_from_resources = AsyncMock(return_value=[])
         pokemon_service.encounter_service.sync_from_resources = AsyncMock(
             return_value=[]
         )

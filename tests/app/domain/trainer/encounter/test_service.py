@@ -150,10 +150,12 @@ async def test_update_list_creates_missing_encounters_and_returns_all() -> None:
     new_encounter = SimpleNamespace(id=uuid4())
 
     service = TrainerEncounterService(repository=AsyncMock(), trainer_log=AsyncMock())
-    service.list_all = AsyncMock(side_effect=[
-        [known_encounter],
-        [known_encounter, SimpleNamespace(pokemon_encounter_id=new_encounter.id)],
-    ])
+    service.list_all = AsyncMock(
+        side_effect=[
+            [known_encounter],
+            [known_encounter, SimpleNamespace(pokemon_encounter_id=new_encounter.id)],
+        ]
+    )
     service.get_or_create = AsyncMock()
 
     result = await service.update_list(
@@ -229,6 +231,7 @@ async def test_select_active_returns_active_encounter() -> None:
     service.repository.update.assert_awaited_once_with(entity=current_encounter_active)
     service.trainer_log.create.assert_awaited_once()
 
+
 @pytest.mark.asyncio
 async def test_select_active_returns_throw() -> None:
     trainer = _build_trainer()
@@ -238,9 +241,9 @@ async def test_select_active_returns_throw() -> None:
     with pytest.raises(HTTPException) as exc_info:
         await service.select_active(trainer=trainer, encounter_id=uuid4())
 
-
     assert exc_info.value.status_code == 404
     service.trainer_log.create.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_deactivate_all_encounters_returns_all_inactive_encounters() -> None:
@@ -257,3 +260,20 @@ async def test_deactivate_all_encounters_returns_all_inactive_encounters() -> No
     result = await service._deactivate_all_encounters(trainer=trainer)
 
     assert result == [encounter_active]
+
+
+@pytest.mark.asyncio
+async def test_active_delegates_to_repository() -> None:
+    from uuid import uuid4
+
+    trainer_id = uuid4()
+    expected = SimpleNamespace(id=uuid4(), is_active=True)
+    service = TrainerEncounterService(repository=AsyncMock(), trainer_log=AsyncMock())
+    service.repository.find_by = AsyncMock(return_value=expected)
+
+    result = await service.active(trainer_id=trainer_id)
+
+    assert result is expected
+    service.repository.find_by.assert_awaited_once_with(
+        trainer_id=trainer_id, is_active=True
+    )

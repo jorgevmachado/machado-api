@@ -58,6 +58,7 @@ class Type:
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="types",
     )
 
     weaknesses: Mapped[list["Type"]] = relationship(

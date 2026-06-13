@@ -110,20 +110,32 @@ class Pokemon:
     )
 
     growth_rate: Mapped["GrowthRate | None"] = relationship(
-        lazy=default_lazy, init=False
+        lazy=default_lazy,
+        init=False,
+        back_populates="pokemons",
     )
     images: Mapped["Image | None"] = relationship(
         lazy=default_lazy,
         init=False,
+        back_populates="pokemons",
     )
-    habitat: Mapped["Habitat | None"] = relationship(lazy=default_lazy, init=False)
-    shape: Mapped["Shape | None"] = relationship(lazy=default_lazy, init=False)
+    habitat: Mapped["Habitat | None"] = relationship(
+        lazy=default_lazy,
+        init=False,
+        back_populates="pokemons",
+    )
+    shape: Mapped["Shape | None"] = relationship(
+        lazy=default_lazy,
+        init=False,
+        back_populates="pokemons",
+    )
     types: Mapped[list["Type"]] = relationship(
         secondary="pokemon_type_link",
         lazy=default_lazy,
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="pokemons",
     )
     moves: Mapped[list["Move"]] = relationship(
         secondary="pokemon_move_link",
@@ -131,6 +143,7 @@ class Pokemon:
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="pokemons",
     )
     abilities: Mapped[list["Ability"]] = relationship(
         secondary="pokemon_ability_link",
@@ -138,6 +151,7 @@ class Pokemon:
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="pokemons",
     )
     encounters: Mapped[list["Encounter"]] = relationship(
         secondary="pokemon_encounter_link",
@@ -145,6 +159,7 @@ class Pokemon:
         default_factory=list,
         init=False,
         repr=False,
+        back_populates="pokemons",
     )
 
     evolutions: Mapped[list["Pokemon"]] = relationship(

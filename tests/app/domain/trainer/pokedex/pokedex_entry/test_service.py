@@ -104,7 +104,7 @@ async def test_find_one_cached_builds_cache_key_with_pokedex_id() -> None:
     service.find_one = AsyncMock(
         return_value=SimpleNamespace(
             id=uuid4(),
-            pokemon=SimpleNamespace(status='complete', name='bulbasaur'),
+            pokemon=SimpleNamespace(status="complete", name="bulbasaur"),
         )
     )
 
@@ -161,7 +161,7 @@ async def test_sync_pokemon_updates_attributes_when_status_is_incomplete() -> No
         special_defense=10,
         pokemon=SimpleNamespace(
             status=PokemonStatusEnum.INCOMPLETE,
-            name='bulbasaur',
+            name="bulbasaur",
         ),
     )
 
@@ -171,7 +171,7 @@ async def test_sync_pokemon_updates_attributes_when_status_is_incomplete() -> No
     service.pokemon_service = AsyncMock()
     service.pokemon_service.find_one = AsyncMock(return_value=pokemon)
 
-    result = await service._sync_pokemon(param='bulbasaur', pokedex_id=str(uuid4()))
+    result = await service._sync_pokemon(param="bulbasaur", pokedex_id=str(uuid4()))
 
     assert result is updated_entity
     repository.update.assert_awaited_once_with(entity=entity)
@@ -187,7 +187,7 @@ async def test_sync_pokemon_skips_update_when_pokemon_not_found() -> None:
         id=uuid4(),
         pokemon=SimpleNamespace(
             status=PokemonStatusEnum.INCOMPLETE,
-            name='bulbasaur',
+            name="bulbasaur",
         ),
     )
 
@@ -196,7 +196,7 @@ async def test_sync_pokemon_skips_update_when_pokemon_not_found() -> None:
     service.pokemon_service = AsyncMock()
     service.pokemon_service.find_one = AsyncMock(return_value=None)
 
-    result = await service._sync_pokemon(param='bulbasaur')
+    result = await service._sync_pokemon(param="bulbasaur")
 
     assert result is entity
     repository.update.assert_not_awaited()
@@ -213,7 +213,9 @@ async def test_discover_marks_entity_as_discovered_and_updates() -> None:
     service._sync_pokemon = AsyncMock(return_value=entity)
     trainer = _build_trainer()
 
-    result = await service.discover(pokedex_id='pokedex-id', trainer=trainer, name='bulbasaur')
+    result = await service.discover(
+        pokedex_id="pokedex-id", trainer=trainer, name="bulbasaur"
+    )
 
     assert result is updated
     assert entity.discovered is True
@@ -229,9 +231,9 @@ async def test_discover_returns_entity_without_throw_when_already_discovered() -
     trainer = _build_trainer()
 
     result = await service.discover(
-        pokedex_id='pokedex-id',
+        pokedex_id="pokedex-id",
         trainer=trainer,
-        name='bulbasaur',
+        name="bulbasaur",
         without_throw=True,
     )
 
@@ -250,7 +252,12 @@ async def test_discover_raises_when_already_discovered_and_throw_enabled() -> No
     trainer = _build_trainer()
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.discover(pokedex_id='pokedex-id', trainer=trainer, name='bulbasaur', without_throw=False)
+        await service.discover(
+            pokedex_id="pokedex-id",
+            trainer=trainer,
+            name="bulbasaur",
+            without_throw=False,
+        )
 
     assert exc_info.value.status_code == 400
-    assert 'already discovered' in exc_info.value.detail
+    assert "already discovered" in exc_info.value.detail

@@ -127,16 +127,19 @@ class TrainerEncounterService(
             trainer_id=trainer.id,
             trainer_encounters=trainer_encounters,
         )
-        
+
         return trainer_encounters
 
-    async def update_list(self, trainer: Trainer, encounters: list[Encounter]) -> list[TrainerEncounter]:
+    async def update_list(
+        self, trainer: Trainer, encounters: list[Encounter]
+    ) -> list[TrainerEncounter]:
         known_encounters = await self.list_all(
             page_filter=FilterPage.build(trainer_id=trainer.id)
         )
 
         known_encounters_map = {
-            str(encounter.pokemon_encounter_id): encounter for encounter in known_encounters
+            str(encounter.pokemon_encounter_id): encounter
+            for encounter in known_encounters
         }
 
         for encounter in encounters:
@@ -155,11 +158,11 @@ class TrainerEncounterService(
                 trainer_id=trainer.id,
                 trainer_encounters=[created_encounter],
             )
-        return await self.list_all(
-            page_filter=FilterPage.build(trainer_id=trainer.id)
-        )
-    
-    async def select_active(self, trainer: Trainer, encounter_id: str) -> TrainerEncounter:        
+        return await self.list_all(page_filter=FilterPage.build(trainer_id=trainer.id))
+
+    async def select_active(
+        self, trainer: Trainer, encounter_id: str
+    ) -> TrainerEncounter:
         entity = await self.repository.find_by(
             trainer_id=trainer.id, pokemon_encounter_id=encounter_id
         )
@@ -177,8 +180,7 @@ class TrainerEncounterService(
                 status_code=HTTPStatus.NOT_FOUND,
                 detail=f"{self.alias} not found",
             )
-            
-            
+
         trainer_encounters = await self._deactivate_all_encounters(trainer=trainer)
         entity.is_active = True
         entity_updated = await self.repository.update(entity=entity)
@@ -198,13 +200,16 @@ class TrainerEncounterService(
 
         return entity_updated
 
-        
-        
-    async def _deactivate_all_encounters(self, trainer: Trainer) -> list[TrainerEncounter]:
+    async def active(self, trainer_id: UUID) -> TrainerEncounter | None:
+        return await self.repository.find_by(trainer_id=trainer_id, is_active=True)
+
+    async def _deactivate_all_encounters(
+        self, trainer: Trainer
+    ) -> list[TrainerEncounter]:
         list_entity = await self.list_all(
             page_filter=FilterPage.build(trainer_id=trainer.id)
         )
-        
+
         trainer_encounters: list[TrainerEncounter] = []
 
         for entity in list_entity:

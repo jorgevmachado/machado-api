@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
+from app.domain.trainer.exploration.schema import ExplorationSchema
 
 from app.domain.trainer.schema import (
     OnboardPayloadSchema,
@@ -23,6 +24,7 @@ from app.domain.trainer.encounter.route import router as trainer_encounter_route
 from app.domain.trainer.owned_pokemon.route import router as owned_pokemon_router
 from app.domain.trainer.pokedex.route import router as pokedex_router
 from app.domain.trainer.party.route import router as trainer_party_router
+from app.domain.trainer.exploration.route import router as explore_router
 
 router = APIRouter(prefix="/trainer", tags=["trainer"])
 router.include_router(
@@ -31,6 +33,8 @@ router.include_router(
 router.include_router(owned_pokemon_router, prefix="/pokemon", tags=["OwnedPokemon"])
 router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
 router.include_router(trainer_party_router, prefix="/party", tags=["TrainerParty"])
+
+router.include_router(explore_router, prefix="/explore", tags=["Exploration"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
@@ -51,10 +55,16 @@ async def onboarding(
 ):
     return await service.onboard(current_user=current_user, payload=payload)
 
-@router.post(
-    "/capture", response_model=TrainerSchema, status_code=HTTPStatus.CREATED
-)
+
+@router.post("/capture", response_model=TrainerSchema, status_code=HTTPStatus.CREATED)
 async def capture(
     payload: CapturePayloadSchema, service: Service, current_user: CurrentUser
 ):
     return await service.capture(current_user=current_user, payload=payload)
+
+
+@router.post(
+    "/explore", response_model=ExplorationSchema, status_code=HTTPStatus.CREATED
+)
+async def explore(service: Service, current_user: CurrentUser):
+    return await service.explore(current_user=current_user)

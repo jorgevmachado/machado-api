@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.domain.trainer.route import capture, get_trainer_service, onboarding
+from app.domain.trainer.route import capture, explore, get_trainer_service, onboarding
 from app.domain.trainer.schema import CapturePayloadSchema, OnboardPayloadSchema
 from app.domain.trainer.service import TrainerService
 
@@ -32,15 +32,24 @@ async def test_onboarding_delegates_to_service(current_user: SimpleNamespace) ->
 
 @pytest.mark.asyncio
 async def test_capture_delegates_to_service(current_user: SimpleNamespace) -> None:
-    payload = CapturePayloadSchema(pokemon_name='bulbasaur', nickname='Bulba')
+    payload = CapturePayloadSchema(pokemon_name="bulbasaur", nickname="Bulba")
     service = AsyncMock()
-    expected = SimpleNamespace(id='trainer-id')
+    expected = SimpleNamespace(id="trainer-id")
     service.capture.return_value = expected
 
-    result = await capture(
-        payload=payload, service=service, current_user=current_user
-    )
+    result = await capture(payload=payload, service=service, current_user=current_user)
 
     assert result is expected
     service.capture.assert_awaited_once_with(current_user=current_user, payload=payload)
 
+
+@pytest.mark.asyncio
+async def test_explore_delegates_to_service(current_user: SimpleNamespace) -> None:
+    service = AsyncMock()
+    expected = SimpleNamespace(id="event-id")
+    service.explore.return_value = expected
+
+    result = await explore(service=service, current_user=current_user)
+
+    assert result is expected
+    service.explore.assert_awaited_once_with(current_user=current_user)

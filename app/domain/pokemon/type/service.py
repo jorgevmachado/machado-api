@@ -13,9 +13,7 @@ from app.domain.pokemon.type.business import (
 )
 
 from app.domain.pokemon.type.repository import TypeRepository
-from app.domain.pokemon.type.schema import (
-    TypeSchema
-)
+from app.domain.pokemon.type.schema import TypeSchema
 from app.infrastructure.external_api import PokeApiClient
 from app.infrastructure.external_api.schemas import NamedExternalResourceSchema
 from app.models import Type, PokemonStatusEnum
@@ -47,9 +45,9 @@ class TypeService(BaseService[TypeRepository, Type]):
         return cls(TypeRepository(session), client)
 
     async def find_one(
-            self,
-            param: str,
-            **kwargs,
+        self,
+        param: str,
+        **kwargs,
     ) -> Type | None:
         entity = await super().find_one(param, **kwargs)
 
@@ -58,36 +56,35 @@ class TypeService(BaseService[TypeRepository, Type]):
 
         return entity
 
-
-    async def sync_from_resources(self, resources: list[dict]) -> list[Type]:        
+    async def sync_from_resources(self, resources: list[dict]) -> list[Type]:
         type_synced: list[Type] = []
-        for entry in resources:            
-            resource = entry.get("type") or entry            
-            url = resource.get("url")            
-            order = ensure_order_number(url)            
+        for entry in resources:
+            resource = entry.get("type") or entry
+            url = resource.get("url")
+            order = ensure_order_number(url)
             entity = await self.get_or_create(order=order, url=url)
             type_synced.append(entity)
         return type_synced
 
     async def _sync_external(
-            self,
-            url: str | None = None,
-            order: int | None = None,
-            entity: Type | None = None,
-            with_damages: bool | None = True
+        self,
+        url: str | None = None,
+        order: int | None = None,
+        entity: Type | None = None,
+        with_damages: bool | None = True,
     ) -> Type:
         url = entity.url if entity else url
         order = entity.order if entity else order
-        
+
         if not order:
             raise ValueError("Order is required to sync external type")
-        
+
         if not url:
             raise ValueError("URL is required to sync external type")
 
         external_type = await self.client.get_type(name_or_id=order)
         if external_type is None:
-            raise ValueError(f"Failed to retrieve external type for order: {order}")        
+            raise ValueError(f"Failed to retrieve external type for order: {order}")
         if entity:
             entity_to_persist = entity
         else:
@@ -119,25 +116,33 @@ class TypeService(BaseService[TypeRepository, Type]):
                     badge_legend_icon_url=badges.badge_legend_icon_url,
                 )
             )
-        
-        damage_relations = ensure_damage_relations(external_type.damage_relations) if with_damages else None
-        
+
+        damage_relations = (
+            ensure_damage_relations(external_type.damage_relations)
+            if with_damages
+            else None
+        )
+
         if not damage_relations:
             return entity_to_persist
 
         return await self._add_damage_relations(
             entity=entity_to_persist,
             type_strengths=damage_relations.strengths,
-            type_weaknesses=damage_relations.weaknesses
+            type_weaknesses=damage_relations.weaknesses,
         )
-    
-    async def get_or_create(self, order: int, url: str | None = None, with_damages: bool | None = True) -> Type:
-        entity = await self.repository.find_by(order=order)    
+
+    async def get_or_create(
+        self, order: int, url: str | None = None, with_damages: bool | None = True
+    ) -> Type:
+        entity = await self.repository.find_by(order=order)
 
         if entity and entity.status == PokemonStatusEnum.COMPLETE:
             return entity
 
-        return await self._sync_external(url=url, order=order, entity=entity, with_damages=with_damages)
+        return await self._sync_external(
+            url=url, order=order, entity=entity, with_damages=with_damages
+        )
 
     async def _add_damage_relations(
         self,
@@ -164,7 +169,6 @@ class TypeService(BaseService[TypeRepository, Type]):
 
         return entity
 
-
     async def _update_description(
         self, type_class_url: str | None, description: str | None = None
     ) -> str:
@@ -186,11 +190,13 @@ class TypeService(BaseService[TypeRepository, Type]):
         self, sync_resource: list[NamedExternalResourceSchema]
     ) -> list[Type]:
         damages: list[Type] = []
-        for resource in sync_resource:            
+        for resource in sync_resource:
             url = resource.url
             order = ensure_order_number(url)
 
-            resource_damage = await self.get_or_create(url=url, order=order, with_damages=False)
+            resource_damage = await self.get_or_create(
+                url=url, order=order, with_damages=False
+            )
 
             if not resource_damage:
                 continue

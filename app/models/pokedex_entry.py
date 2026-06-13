@@ -11,6 +11,7 @@ from app.core.database.base import table_registry, default_lazy
 from app.models.common import utcnow
 
 if TYPE_CHECKING:
+    from app.models.battle_session import BattleSession
     from app.models.pokedex import Pokedex
     from app.models.pokemon import Pokemon
 
@@ -56,3 +57,18 @@ class PokedexEntry:
     )
 
     pokemon: Mapped["Pokemon"] = relationship(init=False, lazy=default_lazy)
+    battle_sessions: Mapped[list["BattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="wild_pokemon",
+    )
+
+    battle_sessions: Mapped[list["BattleSession"]] = relationship(
+        lazy=default_lazy,
+        default_factory=list,
+        init=False,
+        repr=False,
+        back_populates="wild_pokemon",
+    )

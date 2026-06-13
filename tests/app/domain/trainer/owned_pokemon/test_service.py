@@ -416,7 +416,9 @@ async def test_validate_capture_rate_skips_when_trainer_capture_rate_is_none() -
 
 
 @pytest.mark.asyncio
-async def test_validate_capture_rate_raises_when_trainer_rate_below_pokemon_rate() -> None:
+async def test_validate_capture_rate_raises_when_trainer_rate_below_pokemon_rate() -> (
+    None
+):
     service = OwnedPokemonService(
         repository=_build_repository(AsyncMock()),
         pokemon_service=AsyncMock(),
@@ -432,7 +434,7 @@ async def test_validate_capture_rate_raises_when_trainer_rate_below_pokemon_rate
             trainer_capture_rate=100,
         )
     assert exc_info.value.status_code == 400
-    assert 'capture rate' in exc_info.value.detail
+    assert "capture rate" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
@@ -444,7 +446,7 @@ async def test_validate_capture_rate_raises_when_pokemon_breaks_free() -> None:
         trainer_log=AsyncMock(),
     )
     with patch(
-        'app.domain.trainer.owned_pokemon.service.rolled_capture_success',
+        "app.domain.trainer.owned_pokemon.service.rolled_capture_success",
         return_value=False,
     ):
         with pytest.raises(HTTPException) as exc_info:
@@ -456,7 +458,7 @@ async def test_validate_capture_rate_raises_when_pokemon_breaks_free() -> None:
                 trainer_capture_rate=255,
             )
         assert exc_info.value.status_code == 400
-        assert 'capture rate' in exc_info.value.detail
+        assert "capture rate" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
@@ -468,7 +470,7 @@ async def test_validate_capture_rate_passes_when_roll_succeeds() -> None:
         trainer_log=AsyncMock(),
     )
     with patch(
-        'app.domain.trainer.owned_pokemon.service.rolled_capture_success',
+        "app.domain.trainer.owned_pokemon.service.rolled_capture_success",
         return_value=True,
     ):
         await service.validate_capture_rate(

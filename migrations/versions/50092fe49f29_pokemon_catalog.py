@@ -238,6 +238,10 @@ def upgrade() -> None:
         sa.UniqueConstraint("name"),
         sa.UniqueConstraint("order"),
     )
+    op.create_index("ix_pokemons_growth_rate_id", "pokemons", ["growth_rate_id"])
+    op.create_index("ix_pokemons_habitat_id", "pokemons", ["habitat_id"])
+    op.create_index("ix_pokemons_shape_id", "pokemons", ["shape_id"])
+    op.create_index("ix_pokemons_images_id", "pokemons", ["images_id"])
 
     op.create_table(
         "type_strength_link",
@@ -247,6 +251,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["type_strength_id"], ["types.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("type_id", "type_strength_id"),
     )
+    op.create_index(
+        "ix_type_strength_link_strength_id",
+        "type_strength_link",
+        ["type_strength_id"],
+    )
     op.create_table(
         "type_weakness_link",
         sa.Column("type_id", sa.Uuid(), nullable=False),
@@ -254,6 +263,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["type_id"], ["types.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["type_weakness_id"], ["types.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("type_id", "type_weakness_id"),
+    )
+    op.create_index(
+        "ix_type_weakness_link_weakness_id",
+        "type_weakness_link",
+        ["type_weakness_id"],
     )
 
     op.create_table(
@@ -263,6 +277,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["ability_id"], ["abilities.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pokemon_id", "ability_id"),
+    )
+    op.create_index(
+        "ix_pokemon_ability_link_ability_id",
+        "pokemon_ability_link",
+        ["ability_id"],
     )
     op.create_table(
         "pokemon_encounter_link",
@@ -274,6 +293,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pokemon_id", "encounter_id"),
     )
+    op.create_index(
+        "ix_pokemon_encounter_link_encounter_id",
+        "pokemon_encounter_link",
+        ["encounter_id"],
+    )
     op.create_table(
         "pokemon_evolution_link",
         sa.Column("pokemon_id", sa.Uuid(), nullable=False),
@@ -281,6 +305,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["evolution_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pokemon_id", "evolution_id"),
+    )
+    op.create_index(
+        "ix_pokemon_evolution_link_evolution_id",
+        "pokemon_evolution_link",
+        ["evolution_id"],
     )
     op.create_table(
         "pokemon_move_link",
@@ -290,6 +319,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pokemon_id", "move_id"),
     )
+    op.create_index(
+        "ix_pokemon_move_link_move_id",
+        "pokemon_move_link",
+        ["move_id"],
+    )
     op.create_table(
         "pokemon_type_link",
         sa.Column("pokemon_id", sa.Uuid(), nullable=False),
@@ -297,6 +331,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["pokemon_id"], ["pokemons.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["type_id"], ["types.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pokemon_id", "type_id"),
+    )
+    op.create_index(
+        "ix_pokemon_type_link_type_id",
+        "pokemon_type_link",
+        ["type_id"],
     )
     # ### end Alembic commands ###
 
