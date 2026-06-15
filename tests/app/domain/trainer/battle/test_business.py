@@ -35,12 +35,15 @@ def _make_party(moves=None):
         defense=43,
         speed=65,
         level=5,
+        experience=1,
         special_attack=60,
         special_defense=50,
         nickname="char",
+        pokemon_id=uuid4(),
+        pokemon=SimpleNamespace(capture_rate=5),
         moves=moves or [],
     )
-    return SimpleNamespace(slot=1, is_active=True, owned_pokemon=owned)
+    return SimpleNamespace(id=uuid4(),slot=1, is_active=True, owned_pokemon=owned)
 
 
 def _make_wild_pokemon(moves=None):
@@ -57,6 +60,7 @@ def _make_wild_pokemon(moves=None):
         max_hp=40,
         attack=45,
         defense=40,
+        experience=40,
         speed=56,
         level=5,
         special_attack=35,
@@ -99,16 +103,20 @@ def test_build_trainer_party_snapshot_entry_has_correct_fields():
     entry = build_trainer_party_snapshot(party)[0]
 
     owned = party.owned_pokemon
+    assert entry["id"] == str(party.id)
+    assert entry["hp"] == owned.hp
     assert entry["slot"] == party.slot
     assert entry["name"] == owned.name
     assert entry["speed"] == owned.speed
     assert entry["level"] == owned.level
     assert entry["max_hp"] == owned.max_hp
     assert entry["attack"] == owned.attack
-    assert entry["defense"] == owned.defense
+    assert entry["defense"] == owned.defense    
     assert entry["nickname"] == owned.nickname
     assert entry["is_active"] == party.is_active
-    assert entry["current_hp"] == owned.hp
+    assert entry["experience"] == owned.experience
+    assert entry["capture_rate"] == owned.pokemon.capture_rate
+    assert entry["pokemon_id"] == str(owned.pokemon_id)
     assert entry["special_attack"] == owned.special_attack
     assert entry["special_defense"] == owned.special_defense
     assert entry["owned_pokemon_id"] == str(owned.id)
@@ -131,13 +139,14 @@ def test_build_wild_pokemon_snapshot_returns_dict_with_expected_fields():
     result = build_wild_pokemon_snapshot(wild)
 
     assert result["id"] == str(wild.id)
+    assert result["hp"] == wild.hp
     assert result["name"] == wild.pokemon.name
     assert result["level"] == wild.level
     assert result["speed"] == wild.speed
     assert result["attack"] == wild.attack
     assert result["max_hp"] == wild.hp
     assert result["defense"] == wild.defense
-    assert result["current_hp"] == wild.hp
+    assert result["experience"] == wild.experience
     assert result["pokemon_id"] == str(wild.pokemon_id)
     assert result["capture_rate"] == wild.pokemon.capture_rate
     assert result["special_attack"] == wild.special_attack

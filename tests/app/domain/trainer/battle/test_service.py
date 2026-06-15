@@ -28,12 +28,15 @@ def _build_party():
         defense=43,
         speed=65,
         level=5,
+        experience=5,
         special_attack=60,
         special_defense=50,
         nickname="char",
+        pokemon_id=uuid4(),
+        pokemon=SimpleNamespace(capture_rate=5),
         moves=[],
     )
-    return SimpleNamespace(slot=1, is_active=True, owned_pokemon=owned)
+    return SimpleNamespace(id=uuid4(), slot=1, is_active=True, owned_pokemon=owned)
 
 
 def _build_trainer():
@@ -58,6 +61,7 @@ def _build_wild_pokemon():
         attack=45,
         defense=40,
         speed=56,
+        experience=56,
         special_attack=35,
         special_defense=35,
         pokemon=SimpleNamespace(
