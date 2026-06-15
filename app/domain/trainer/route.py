@@ -25,6 +25,7 @@ from app.domain.trainer.owned_pokemon.route import router as owned_pokemon_route
 from app.domain.trainer.pokedex.route import router as pokedex_router
 from app.domain.trainer.party.route import router as trainer_party_router
 from app.domain.trainer.exploration.route import router as explore_router
+from app.domain.trainer.battle.route import router as battle_router
 
 router = APIRouter(prefix="/trainer", tags=["trainer"])
 router.include_router(
@@ -35,6 +36,8 @@ router.include_router(pokedex_router, prefix="/pokedex", tags=["Pokedex"])
 router.include_router(trainer_party_router, prefix="/party", tags=["TrainerParty"])
 
 router.include_router(explore_router, prefix="/explore", tags=["Exploration"])
+
+router.include_router(battle_router, prefix="/battle", tags=["Battle"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 

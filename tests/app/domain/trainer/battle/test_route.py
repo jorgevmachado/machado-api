@@ -28,13 +28,12 @@ def test_get_battle_filter_builds_filter():
 
 
 @pytest.mark.asyncio
-async def test_list_all_delegates_to_service():
+async def test_list_all_delegates_to_service(current_trainer: SimpleNamespace):
     service = AsyncMock()
     service.list_all_cached.return_value = []
-    current_user = SimpleNamespace(username="ash")
     page_filter = get_battle_filter(limit=12)
 
-    await list_all(service=service, current_user=current_user, page_filter=page_filter)
+    await list_all(service=service, current_trainer=current_trainer, page_filter=page_filter)
 
     service.list_all_cached.assert_awaited_once()
     kwargs = service.list_all_cached.await_args.kwargs
@@ -42,16 +41,16 @@ async def test_list_all_delegates_to_service():
 
 
 @pytest.mark.asyncio
-async def test_find_one_delegates_to_service():
+async def test_find_one_delegates_to_service(current_trainer: SimpleNamespace):
     expected = SimpleNamespace(id=uuid4())
     service = AsyncMock()
     service.find_one_cached.return_value = expected
-    current_user = SimpleNamespace(username="ash")
 
-    result = await find_one(param="some-id", service=service, current_user=current_user)
+    result = await find_one(param="some-id", service=service, current_trainer=current_trainer)
 
     assert result is expected
     service.find_one_cached.assert_awaited_once_with(
         param="some-id",
         user_request="ash",
+        trainer_id=current_trainer.id,
     )

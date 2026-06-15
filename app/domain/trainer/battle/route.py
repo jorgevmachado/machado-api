@@ -8,9 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.pagination import CustomLimitOffsetPage
-from app.core.security import get_current_user
-
-from app.models.user import User
+from app.core.security import get_current_trainer
+from app.models import Trainer
 
 from app.shared.schemas import FilterPage
 
@@ -28,7 +27,7 @@ def get_battle_service(session: Session) -> BattleService:
 
 
 Service = Annotated[BattleService, Depends(get_battle_service)]
-CurrentUser = Annotated[User, Depends(get_current_user)]
+CurrentTrainer = Annotated[Trainer, Depends(get_current_trainer)]
 
 
 def get_battle_filter(
@@ -56,18 +55,19 @@ def get_battle_filter(
 )
 async def list_all(
     service: Service,
-    current_user: CurrentUser,
+    current_trainer: CurrentTrainer,
     page_filter: Annotated[FilterPage, Depends(get_battle_filter)] = None,
 ):
     return await service.list_all_cached(
-        page_filter=page_filter,
-        user_request=current_user.username,
+        page_filter=FilterPage.build(page_filter, trainer_id=current_trainer.id),
+        user_request=current_trainer.user.username,
     )
 
 
 @router.get("/{param}", response_model=BattleSchema, status_code=HTTPStatus.OK)
-async def find_one(param: str, service: Service, current_user: CurrentUser):
+async def find_one(param: str, service: Service, current_trainer: CurrentTrainer):
     return await service.find_one_cached(
         param=param,
-        user_request=current_user.username,
+        trainer_id=current_trainer.id,
+        user_request=current_trainer.user.username,
     )
