@@ -19,6 +19,7 @@ from app.domain.trainer.pokedex.repository import PokedexRepository
 from app.domain.trainer.pokedex.schema import (
     PokedexSchema,
 )
+from app.domain.trainer.progression import AttributesCalculatedSchema
 from app.domain.trainer.trainer_log.service import TrainerLogService
 from app.models import (
     Pokedex,
@@ -212,3 +213,37 @@ class PokedexService(BaseService[PokedexRepository, Pokedex]):
             pokedex_id=pokedex_id,
             without_throw=without_throw,
         )
+
+    async def update_after_battle(
+        self,
+        trainer: Trainer,
+        pokedex_entry: PokedexEntry,
+        pokedex_entry_progression: AttributesCalculatedSchema,
+    ) -> PokedexEntry:
+        has_update = False
+
+        if pokedex_entry.hp != pokedex_entry_progression.hp:
+            pokedex_entry.hp = pokedex_entry_progression.hp
+            has_update = True
+
+        if pokedex_entry_progression.level_up:
+            pokedex_entry.hp = pokedex_entry_progression.hp
+            pokedex_entry.level = pokedex_entry_progression.level
+            pokedex_entry.speed = pokedex_entry_progression.speed
+            pokedex_entry.attack = pokedex_entry_progression.attack
+            pokedex_entry.max_hp = pokedex_entry_progression.max_hp
+            pokedex_entry.defense = pokedex_entry_progression.defense
+            pokedex_entry.experience = pokedex_entry_progression.experience
+            pokedex_entry.special_attack = pokedex_entry_progression.special_attack
+            pokedex_entry.special_defense = pokedex_entry_progression.special_defense
+            has_update = True
+
+        if has_update:
+            await self.pokedex_entry_service.update_entity(entity=pokedex_entry)
+            return await self.find_one(
+                param=str(pokedex_entry.id),
+                trainer_id=trainer.id,
+                user_request=trainer.user.username,
+            )
+
+        return pokedex_entry

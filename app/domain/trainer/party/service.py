@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
 from app.core.service.base import BaseService
+from app.domain.trainer.owned_pokemon.service import OwnedPokemonService
 from app.domain.trainer.party.business import MAX_PARTY_SIZE
 
 from app.domain.trainer.party.repository import TrainerPartyRepository
 from app.domain.trainer.party.schema import (
     TrainerPartySchema,
+    TrainerPartyBattleSchema,
 )
+from app.domain.trainer.progression import AttributesCalculatedSchema
 from app.domain.trainer.trainer_log.service import TrainerLogService
 from app.models import (
     TrainerParty,
@@ -33,6 +37,7 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
         self,
         repository: TrainerPartyRepository,
         trainer_log: TrainerLogService | None = None,
+        owned_pokemon_service: OwnedPokemonService | None = None,
     ) -> None:
         super().__init__(
             alias="TrainerParty",
@@ -47,6 +52,9 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
         )
         session = repository.session
         self.trainer_log = trainer_log or TrainerLogService.from_session(session)
+        self.owned_pokemon_service = (
+            owned_pokemon_service or OwnedPokemonService.from_session(session)
+        )
 
     @classmethod
     def from_session(cls, session: AsyncSession):
@@ -181,3 +189,100 @@ class TrainerPartyService(BaseService[TrainerPartyRepository, TrainerParty]):
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Trainer has no battle-ready Pokemon",
         )
+
+    async def preparation_for_battle(
+        self, trainer: Trainer, owned_pokemon_id: UUID, owned_pokemon_move_id: str
+    ) -> TrainerPartyBattleSchema:
+        trainer_party = await self.find_by(
+            trainer_id=trainer.id,
+            owned_pokemon_id=owned_pokemon_id,
+            is_active=True,
+            without_throw=True,
+        )
+
+        if not trainer_party:
+            message = f"No active party slot found for trainer {trainer.id}"
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.BATTLE,
+                user_id=trainer.user.id,
+                status=LogStatusEnum.ERROR,
+                message=message,
+                log_type=LogTypeEnum.PARTY,
+                trainer_id=trainer.id,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=message,
+            )
+
+        if trainer_party.owned_pokemon.hp <= 0:
+            message = (
+                f"Trainer Pokemon {trainer_party.owned_pokemon.name} is already fainted"
+            )
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.BATTLE,
+                user_id=trainer.user.id,
+                status=LogStatusEnum.ERROR,
+                message=message,
+                log_type=LogTypeEnum.POKEMON,
+                trainer_id=trainer.id,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=message,
+            )
+
+        trainer_party_selected_move = (
+            await self.owned_pokemon_service.select_move_to_battle(
+                trainer=trainer,
+                owned_pokemon_id=owned_pokemon_id,
+                owned_pokemon_move_id=owned_pokemon_move_id,
+            )
+        )
+
+        if not trainer_party_selected_move:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=f"Move with id {owned_pokemon_move_id} not found for owned Pokemon {trainer_party.owned_pokemon.name}",
+            )
+
+        return TrainerPartyBattleSchema(
+            trainer_party=trainer_party,
+            trainer_party_selected_move=trainer_party_selected_move,
+        )
+
+    async def update_after_battle(
+        self,
+        trainer: Trainer,
+        trainer_party: TrainerParty,
+        selected_pokemon_progression: AttributesCalculatedSchema,
+    ) -> TrainerParty:
+        has_update = False
+
+        owned_pokemon = trainer_party.owned_pokemon
+
+        if owned_pokemon.hp != selected_pokemon_progression.hp:
+            owned_pokemon.hp = selected_pokemon_progression.hp
+            has_update = True
+
+        if selected_pokemon_progression.level_up:
+            owned_pokemon.hp = selected_pokemon_progression.hp
+            owned_pokemon.level = selected_pokemon_progression.level
+            owned_pokemon.speed = selected_pokemon_progression.speed
+            owned_pokemon.attack = selected_pokemon_progression.attack
+            owned_pokemon.max_hp = selected_pokemon_progression.max_hp
+            owned_pokemon.defense = selected_pokemon_progression.defense
+            owned_pokemon.experience = selected_pokemon_progression.experience
+            owned_pokemon.special_attack = selected_pokemon_progression.special_attack
+            owned_pokemon.special_defense = selected_pokemon_progression.special_defense
+            has_update = True
+
+        if has_update:
+            await self.owned_pokemon_service.update_entity(entity=owned_pokemon)
+            return await self.find_one(
+                param=str(trainer_party.id),
+                trainer_id=trainer.id,
+                user_request=trainer.user.username,
+            )
+
+        return trainer_party

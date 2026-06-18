@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -9,6 +9,7 @@ from fastapi import HTTPException
 
 from app.domain.trainer.party.business import MAX_PARTY_SIZE
 from app.domain.trainer.party.service import TrainerPartyService
+from app.domain.trainer.progression import AttributesCalculatedSchema
 
 
 def _build_repository(session: AsyncMock) -> AsyncMock:
@@ -261,3 +262,202 @@ async def test_ready_to_battle_raises_when_all_pokemon_fainted(
 
     assert exc_info.value.status_code == 400
     assert "battle-ready" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_preparation_for_battle_raises_when_active_party_not_found(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session),
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock(return_value=None)
+
+    with pytest.raises(HTTPException, match="No active party slot"):
+        await service.preparation_for_battle(
+            trainer=trainer,
+            owned_pokemon_id=uuid4(),
+            owned_pokemon_move_id="move-id",
+        )
+
+
+@pytest.mark.asyncio
+async def test_preparation_for_battle_raises_when_owned_pokemon_is_fainted(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=0, name="pikachu"))
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session),
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock(return_value=trainer_party)
+
+    with pytest.raises(HTTPException, match="already fainted"):
+        await service.preparation_for_battle(
+            trainer=trainer,
+            owned_pokemon_id=uuid4(),
+            owned_pokemon_move_id="move-id",
+        )
+
+
+@pytest.mark.asyncio
+async def test_preparation_for_battle_raises_when_selected_move_is_missing(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=10, name="pikachu"))
+    owned_service = AsyncMock()
+    owned_service.select_move_to_battle = AsyncMock(return_value=None)
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session),
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=owned_service,
+    )
+    service.find_by = AsyncMock(return_value=trainer_party)
+
+    with pytest.raises(HTTPException, match="not found for owned Pokemon"):
+        await service.preparation_for_battle(
+            trainer=trainer,
+            owned_pokemon_id=uuid4(),
+            owned_pokemon_move_id="missing-move",
+        )
+
+
+@pytest.mark.asyncio
+async def test_preparation_for_battle_returns_schema_when_valid(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    owned_pokemon_id = uuid4()
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(hp=10, name="pikachu"))
+    selected_move = SimpleNamespace(id=uuid4())
+    owned_service = AsyncMock()
+    owned_service.select_move_to_battle = AsyncMock(return_value=selected_move)
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session),
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=owned_service,
+    )
+    service.find_by = AsyncMock(return_value=trainer_party)
+
+    expected = SimpleNamespace(
+        trainer_party=trainer_party,
+        trainer_party_selected_move=selected_move,
+    )
+    with patch(
+        "app.domain.trainer.party.service.TrainerPartyBattleSchema",
+        return_value=expected,
+    ):
+        result = await service.preparation_for_battle(
+            trainer=trainer,
+            owned_pokemon_id=owned_pokemon_id,
+            owned_pokemon_move_id="move-id",
+        )
+
+    assert result is expected
+
+
+@pytest.mark.asyncio
+async def test_update_after_battle_returns_same_party_when_no_changes(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer.user.username = "ash"
+    owned = SimpleNamespace(
+        hp=30,
+        level=5,
+        speed=10,
+        attack=10,
+        max_hp=35,
+        defense=10,
+        experience=100,
+        special_attack=10,
+        special_defense=10,
+    )
+    trainer_party = SimpleNamespace(id=uuid4(), owned_pokemon=owned)
+    progression = AttributesCalculatedSchema(
+        hp=30,
+        level=5,
+        speed=10,
+        attack=10,
+        max_hp=35,
+        defense=10,
+        level_up=False,
+        experience=100,
+        special_attack=10,
+        special_defense=10,
+    )
+    owned_service = AsyncMock()
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session),
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=owned_service,
+    )
+    service.find_one = AsyncMock()
+
+    result = await service.update_after_battle(
+        trainer=trainer,
+        trainer_party=trainer_party,
+        selected_pokemon_progression=progression,
+    )
+
+    assert result is trainer_party
+    owned_service.update_entity.assert_not_awaited()
+    service.find_one.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_after_battle_updates_and_reloads_party(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = _build_trainer()
+    trainer.user.username = "ash"
+    owned = SimpleNamespace(
+        hp=30,
+        level=5,
+        speed=10,
+        attack=10,
+        max_hp=35,
+        defense=10,
+        experience=100,
+        special_attack=10,
+        special_defense=10,
+    )
+    trainer_party = SimpleNamespace(id=uuid4(), owned_pokemon=owned)
+    progression = AttributesCalculatedSchema(
+        hp=50,
+        level=6,
+        speed=20,
+        attack=21,
+        max_hp=55,
+        defense=22,
+        level_up=True,
+        experience=200,
+        special_attack=23,
+        special_defense=24,
+    )
+    owned_service = AsyncMock()
+    service = TrainerPartyService(
+        repository=_build_repository(trainer_session),
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=owned_service,
+    )
+    reloaded = SimpleNamespace(id=trainer_party.id)
+    service.find_one = AsyncMock(return_value=reloaded)
+
+    result = await service.update_after_battle(
+        trainer=trainer,
+        trainer_party=trainer_party,
+        selected_pokemon_progression=progression,
+    )
+
+    assert result is reloaded
+    assert owned.hp == 50
+    assert owned.level == 6
+    assert owned.speed == 20
+    owned_service.update_entity.assert_awaited_once_with(entity=owned)

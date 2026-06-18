@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +32,7 @@ from app.models import (
     Trainer,
     LogStatusEnum,
     Pokemon,
+    OwnedPokemonMove,
 )
 from app.shared.schemas import FilterPage
 
@@ -267,3 +269,46 @@ class OwnedPokemonService(BaseService[OwnedPokemonRepository, OwnedPokemon]):
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail=message,
             )
+
+    async def select_move_to_battle(
+        self, trainer: Trainer, owned_pokemon_id: UUID, owned_pokemon_move_id: str
+    ) -> OwnedPokemonMove:
+        owned_pokemon_move = await self.owned_pokemon_move_service.find_by(
+            id=owned_pokemon_move_id,
+            owned_pokemon_id=owned_pokemon_id,
+            without_throw=True,
+        )
+
+        if not owned_pokemon_move:
+            message = f"Move with id {owned_pokemon_move_id} not found for owned Pokemon {owned_pokemon_id}"
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.BATTLE,
+                user_id=trainer.user.id,
+                status=LogStatusEnum.ERROR,
+                message=message,
+                log_type=LogTypeEnum.POKEMON,
+                trainer_id=trainer.id,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=message,
+            )
+        if owned_pokemon_move.pp <= 0:
+            message = (
+                f"Move with id {owned_pokemon_move_id} has no PP left for owned Pokemon {owned_pokemon_move.owned_pokemon.name}",
+            )
+            await self.trainer_log.create(
+                event=TrainerLogEventEnum.BATTLE,
+                user_id=trainer.user.id,
+                status=LogStatusEnum.ERROR,
+                message=message,
+                log_type=LogTypeEnum.POKEMON,
+                trainer_id=trainer.id,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=message,
+            )
+        owned_pokemon_move.pp = owned_pokemon_move.pp - 1
+        await self.owned_pokemon_move_service.update_entity(entity=owned_pokemon_move)
+        return owned_pokemon_move

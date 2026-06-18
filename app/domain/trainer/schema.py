@@ -68,3 +68,8 @@ class OnboardPayloadSchema(BaseModel):
 class CapturePayloadSchema(BaseModel):
     nickname: str | None = None
     pokemon_name: str = Field(min_length=1)
+
+
+class FightPayloadSchema(BaseModel):
+    battle_id: str | None = None
+    owned_pokemon_move_id: str = Field(min_length=1)

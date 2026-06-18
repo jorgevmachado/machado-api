@@ -8,12 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
+from app.domain.trainer.battle.schema import BattleSchema
 from app.domain.trainer.exploration.schema import ExplorationSchema
 
 from app.domain.trainer.schema import (
     OnboardPayloadSchema,
     TrainerSchema,
     CapturePayloadSchema,
+    FightPayloadSchema,
 )
 
 from app.models import User
@@ -71,3 +73,10 @@ async def capture(
 )
 async def explore(service: Service, current_user: CurrentUser):
     return await service.explore(current_user=current_user)
+
+
+@router.post("/fight", response_model=BattleSchema, status_code=HTTPStatus.CREATED)
+async def fight(
+    payload: FightPayloadSchema, service: Service, current_user: CurrentUser
+):
+    return await service.fight(current_user=current_user, payload=payload)

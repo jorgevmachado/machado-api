@@ -29,6 +29,7 @@ class TrainerLogEventEnum(str, Enum):
     FLEE = "FLEE"
     SHOWN = "SHOWN"
     MOVED = "MOVED"
+    BATTLE = "BATTLE"
     CREATED = "CREATED"
     UPDATED = "UPDATED"
     DELETED = "DELETED"

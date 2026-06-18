@@ -474,3 +474,33 @@ class TestBaseServiceFindOneCache:
         )
         assert result == entity
         base_service.cache_service.set_one.assert_awaited_once()
+
+
+class TestBaseServiceUpdateEntity:
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_update_entity_success(base_service, mock_repository):
+        entity = {"id": "123", "name": "pikachu"}
+        mock_repository.update = AsyncMock(return_value=entity)
+
+        with patch("app.core.service.base.log_service_success") as mock_log_success:
+            result = await base_service.update_entity(entity=entity, user_request="ash")
+
+        assert result is entity
+        mock_repository.update.assert_awaited_once_with(entity=entity)
+        mock_log_success.assert_called_once()
+
+    @staticmethod
+    @pytest.mark.asyncio
+    async def test_update_entity_handles_exception(base_service, mock_repository):
+        entity = {"id": "123", "name": "pikachu"}
+        mock_repository.update = AsyncMock(side_effect=Exception("db-error"))
+
+        with (
+            patch("app.core.service.base.handle_service_exception") as mock_handle_exc,
+            patch("app.core.service.base.log_service_success") as mock_log_success,
+        ):
+            await base_service.update_entity(entity=entity, user_request="ash")
+
+        mock_handle_exc.assert_called_once()
+        mock_log_success.assert_called_once()

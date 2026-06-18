@@ -220,3 +220,28 @@ class BaseService[
                 message=f"Update {self.alias} successfully",
                 user_request=user_request,
             )
+
+    async def update_entity(
+        self,
+        entity: ModelT,
+        user_request: str | None = None,
+    ) -> ModelT:
+        print("FUCK")
+        try:
+            return await self.repository.update(entity=entity)
+        except Exception as exception:
+            handle_service_exception(
+                exception,
+                logger=self.logger_params.logger,
+                service=self.logger_params.service,
+                operation="update",
+                user_request=user_request,
+                raise_exception=True,
+            )
+        finally:
+            log_service_success(
+                self.logger_params,
+                operation="update",
+                message=f"Update Entity {self.alias} successfully",
+                user_request=user_request,
+            )

@@ -36,7 +36,7 @@ def upgrade() -> None:
                 """)
     op.execute("""
                         DO $$ BEGIN
-                            CREATE TYPE trainerlogeventenum AS ENUM ('WON', 'LOST', 'FLEE', 'SHOWN', 'MOVED', 'CREATED', 'UPDATED', 'DELETED', 'EXPLORED', 'CAPTURED', 'DISCOVERED');
+                            CREATE TYPE trainerlogeventenum AS ENUM ('WON', 'LOST', 'FLEE', 'SHOWN', 'MOVED', 'BATTLE', 'CREATED', 'UPDATED', 'DELETED', 'EXPLORED', 'CAPTURED', 'DISCOVERED');
                         EXCEPTION
                             WHEN duplicate_object THEN null;
                         END $$;
@@ -82,6 +82,7 @@ def upgrade() -> None:
                 "FLEE",
                 "SHOWN",
                 "MOVED",
+                "BATTLE",
                 "CREATED",
                 "UPDATED",
                 "DELETED",

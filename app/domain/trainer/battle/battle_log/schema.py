@@ -14,8 +14,8 @@ class BattleLogSchema(BaseModel):
     battle_session_id: UUID
     message: str
     payload: dict = {}
-    log_type: BattleLogTypeEnum    
+    log_type: BattleLogTypeEnum
     created_at: datetime
-    reference: str | None = None    
+    reference: str | None = None
     updated_at: datetime | None = None
     deleted_at: datetime | None = None

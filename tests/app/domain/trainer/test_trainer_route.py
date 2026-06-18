@@ -5,8 +5,18 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.domain.trainer.route import capture, explore, get_trainer_service, onboarding
-from app.domain.trainer.schema import CapturePayloadSchema, OnboardPayloadSchema
+from app.domain.trainer.route import (
+    capture,
+    explore,
+    fight,
+    get_trainer_service,
+    onboarding,
+)
+from app.domain.trainer.schema import (
+    CapturePayloadSchema,
+    FightPayloadSchema,
+    OnboardPayloadSchema,
+)
 from app.domain.trainer.service import TrainerService
 
 
@@ -53,3 +63,19 @@ async def test_explore_delegates_to_service(current_user: SimpleNamespace) -> No
 
     assert result is expected
     service.explore.assert_awaited_once_with(current_user=current_user)
+
+
+@pytest.mark.asyncio
+async def test_fight_delegates_to_service(current_user: SimpleNamespace) -> None:
+    payload = FightPayloadSchema(
+        battle_id="battle-id",
+        owned_pokemon_move_id="move-id",
+    )
+    service = AsyncMock()
+    expected = SimpleNamespace(id="battle-id")
+    service.fight.return_value = expected
+
+    result = await fight(payload=payload, service=service, current_user=current_user)
+
+    assert result is expected
+    service.fight.assert_awaited_once_with(current_user=current_user, payload=payload)

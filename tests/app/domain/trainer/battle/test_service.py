@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -142,9 +142,8 @@ async def test_create_or_resume_creates_new_session_when_none_active():
     saved = repository.save.await_args.kwargs["entity"]
     assert saved.trainer_id == trainer.id
     assert saved.wild_pokemon_id == wild_pokemon.id
-    assert saved.wild_pokemon_name == wild_pokemon.name
     assert saved.trainer_active_owned_pokemon_id == party.owned_pokemon.id
-    assert isinstance(saved.trainer_party_snapshot, list)
+    assert saved.trainer_party_snapshot["name"] == party.owned_pokemon.name
 
 
 @pytest.mark.asyncio
@@ -181,6 +180,147 @@ async def test_create_or_resume_passes_correct_payload_to_battle_log():
     call_kwargs = battle_log_service.start.await_args.kwargs
     assert call_kwargs["battle_session_id"] == saved_entity.id
     payload = call_kwargs["payload"]
-    assert payload["pokemon_name"] == wild_pokemon.name
+    assert payload["wild_pokemon_name"] == wild_pokemon.name
     assert payload["exploration_event_id"] == str(exploration_event.id)
-    assert payload["trainer_active_owned_pokemon_id"] == str(party.owned_pokemon.id)
+    assert payload["trainer_active_pokemon_id"] == str(party.owned_pokemon.id)
+
+
+@pytest.mark.asyncio
+async def test_get_raises_not_found_when_no_active_battle() -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    service = BattleService(
+        repository=_build_repository(AsyncMock()),
+        trainer_log=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        battle_log_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock(return_value=None)
+
+    with pytest.raises(Exception):
+        await service.get(trainer=trainer)
+
+
+@pytest.mark.asyncio
+async def test_get_raises_when_battle_is_not_active() -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    finished = SimpleNamespace(id=uuid4(), status=BattleSessionStatusEnum.ESCAPED)
+    service = BattleService(
+        repository=_build_repository(AsyncMock()),
+        trainer_log=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        battle_log_service=AsyncMock(),
+    )
+    service.find_by = AsyncMock(return_value=finished)
+
+    with pytest.raises(Exception):
+        await service.get(trainer=trainer)
+
+
+@pytest.mark.asyncio
+async def test_get_returns_active_battle_by_battle_id() -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    active = SimpleNamespace(id=uuid4(), status=BattleSessionStatusEnum.ACTIVE)
+    service = BattleService(
+        repository=_build_repository(AsyncMock()),
+        trainer_log=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        battle_log_service=AsyncMock(),
+    )
+    service.find_one = AsyncMock(return_value=active)
+
+    result = await service.get(trainer=trainer, battle_id=str(active.id))
+
+    assert result is active
+    service.find_one.assert_awaited_once_with(param=str(active.id), trainer_id=trainer.id)
+
+
+@pytest.mark.asyncio
+async def test_persist_increments_turn_and_creates_log_when_no_error() -> None:
+    repository = _build_repository(AsyncMock())
+    updated = SimpleNamespace(id=uuid4())
+    repository.update = AsyncMock(return_value=updated)
+    battle_log_service = AsyncMock()
+    service = BattleService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        battle_log_service=battle_log_service,
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        status=BattleSessionStatusEnum.ACTIVE,
+        turn_number=2,
+        exploration_event_id=uuid4(),
+    )
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(id=uuid4()))
+    battle_result = SimpleNamespace(error=False, status=BattleSessionStatusEnum.ACTIVE)
+
+    with (
+        patch(
+            "app.domain.trainer.battle.service.build_payload",
+            return_value={"message": "ok"},
+        ),
+        patch(
+            "app.domain.trainer.battle.service.build_wild_pokemon_snapshot",
+            return_value={"hp": 10},
+        ),
+        patch(
+            "app.domain.trainer.battle.service.build_trainer_party_snapshot",
+            return_value={"hp": 20},
+        ),
+        patch("app.domain.trainer.battle.service.utcnow", return_value="now"),
+    ):
+        result = await service.persist(
+            wild_pokemon=SimpleNamespace(),
+            trainer_party=trainer_party,
+            battle_session=battle_session,
+            battle_result=battle_result,
+        )
+
+    assert result is updated
+    assert battle_session.turn_number == 3
+    battle_log_service.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_persist_keeps_turn_when_result_has_error() -> None:
+    repository = _build_repository(AsyncMock())
+    repository.update = AsyncMock(return_value=SimpleNamespace(id=uuid4()))
+    service = BattleService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        pokedex_service=AsyncMock(),
+        battle_log_service=AsyncMock(),
+    )
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        status=BattleSessionStatusEnum.ACTIVE,
+        turn_number=2,
+        exploration_event_id=uuid4(),
+    )
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(id=uuid4()))
+    battle_result = SimpleNamespace(error=True, status=BattleSessionStatusEnum.ACTIVE)
+
+    with (
+        patch(
+            "app.domain.trainer.battle.service.build_payload",
+            return_value={"message": "error"},
+        ),
+        patch(
+            "app.domain.trainer.battle.service.build_wild_pokemon_snapshot",
+            return_value={"hp": 10},
+        ),
+        patch(
+            "app.domain.trainer.battle.service.build_trainer_party_snapshot",
+            return_value={"hp": 20},
+        ),
+        patch("app.domain.trainer.battle.service.utcnow", return_value="now"),
+    ):
+        await service.persist(
+            wild_pokemon=SimpleNamespace(),
+            trainer_party=trainer_party,
+            battle_session=battle_session,
+            battle_result=battle_result,
+        )
+
+    assert battle_session.turn_number == 2

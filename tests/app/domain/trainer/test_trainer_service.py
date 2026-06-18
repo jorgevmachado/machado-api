@@ -8,9 +8,14 @@ import pytest
 from fastapi import HTTPException
 
 from app.core.exceptions import AppHTTPException
-from app.domain.trainer.schema import CapturePayloadSchema, OnboardPayloadSchema
+from app.domain.trainer.schema import (
+    CapturePayloadSchema,
+    FightPayloadSchema,
+    OnboardPayloadSchema,
+)
 from app.domain.trainer.service import TrainerService
 from app.models import PokemonStatusEnum, RoleEnum
+from app.models.enums import BattleSessionStatusEnum
 
 
 def _build_repository(session: AsyncMock) -> AsyncMock:
@@ -84,12 +89,20 @@ def test_init_builds_default_dependencies_from_session(
         patch(
             "app.domain.trainer.service.TrainerPartyService.from_session"
         ) as party_from_session,
+        patch(
+            "app.domain.trainer.service.BattleService.from_session"
+        ) as battle_from_session,
+        patch(
+            "app.domain.trainer.service.ExplorationService.from_session"
+        ) as exploration_from_session,
     ):
         owned_from_session.return_value = AsyncMock()
         pokemon_from_session.return_value = AsyncMock()
         pokedex_from_session.return_value = AsyncMock()
         encounter_from_session.return_value = AsyncMock()
         party_from_session.return_value = AsyncMock()
+        battle_from_session.return_value = AsyncMock()
+        exploration_from_session.return_value = AsyncMock()
 
         TrainerService(repository=repository)
 
@@ -98,6 +111,8 @@ def test_init_builds_default_dependencies_from_session(
         pokedex_from_session.assert_called_once_with(trainer_session)
         encounter_from_session.assert_called_once_with(trainer_session)
         party_from_session.assert_called_once_with(trainer_session)
+        battle_from_session.assert_called_once_with(trainer_session)
+        exploration_from_session.assert_called_once_with(trainer_session)
 
 
 @pytest.mark.asyncio
@@ -752,3 +767,202 @@ async def test_explore_updates_pokeballs_for_pokeball_event(
 
     repository.update.assert_awaited()
     assert trainer.pokeballs == 8
+
+
+# ── fight ──────────────────────────────────────────────────────────────────────
+
+
+def _build_service_for_fight(
+    trainer_session,
+    *,
+    battle_service=None,
+    trainer_party_service=None,
+    pokedex_service=None,
+):
+    repository = _build_repository(trainer_session)
+    return TrainerService(
+        repository=repository,
+        trainer_log=AsyncMock(),
+        owned_pokemon_service=AsyncMock(),
+        pokemon_service=AsyncMock(),
+        pokedex_service=pokedex_service or AsyncMock(),
+        trainer_encounter_service=AsyncMock(),
+        trainer_party_service=trainer_party_service or AsyncMock(),
+        battle_service=battle_service or AsyncMock(),
+        exploration_service=AsyncMock(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_fight_raises_when_trainer_not_onboarded(
+    trainer_session: AsyncMock,
+) -> None:
+    service = _build_service_for_fight(trainer_session)
+    user = SimpleNamespace(id=uuid4(), username="ash", trainer=None, role=RoleEnum.USER)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.fight(
+            current_user=user,
+            payload=FightPayloadSchema(
+                battle_id="battle-id",
+                owned_pokemon_move_id="move-id",
+            ),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "onboarded" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_fight_persists_error_result_without_progression_updates(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        status=BattleSessionStatusEnum.ACTIVE,
+        wild_pokemon_id=uuid4(),
+        trainer_active_owned_pokemon_id=uuid4(),
+    )
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(id=uuid4()))
+    trainer_party_battle = SimpleNamespace(
+        trainer_party=trainer_party,
+        trainer_party_selected_move=SimpleNamespace(
+            pokemon_move=SimpleNamespace(id=uuid4(), name="tackle")
+        ),
+    )
+    wild_pokemon = SimpleNamespace(id=battle_session.wild_pokemon_id)
+    battle_result = SimpleNamespace(error=True, status=BattleSessionStatusEnum.ACTIVE)
+    persisted = SimpleNamespace(id=uuid4())
+
+    battle_service = AsyncMock()
+    battle_service.get = AsyncMock(return_value=battle_session)
+    battle_service.persist = AsyncMock(return_value=persisted)
+
+    trainer_party_service = AsyncMock()
+    trainer_party_service.preparation_for_battle = AsyncMock(
+        return_value=trainer_party_battle
+    )
+
+    pokedex_service = AsyncMock()
+    pokedex_service.find_one_cached = AsyncMock(return_value=wild_pokemon)
+    pokedex_service.update_after_battle = AsyncMock()
+
+    service = _build_service_for_fight(
+        trainer_session,
+        battle_service=battle_service,
+        trainer_party_service=trainer_party_service,
+        pokedex_service=pokedex_service,
+    )
+    trainer_party_service.update_after_battle = AsyncMock()
+    user = SimpleNamespace(
+        id=uuid4(),
+        username="ash",
+        trainer=trainer,
+        role=RoleEnum.USER,
+    )
+
+    with patch("app.domain.trainer.service.process_battle", return_value=battle_result):
+        result = await service.fight(
+            current_user=user,
+            payload=FightPayloadSchema(
+                battle_id=str(battle_session.id),
+                owned_pokemon_move_id="move-id",
+            ),
+        )
+
+    assert result is persisted
+    battle_service.persist.assert_awaited_once_with(
+        wild_pokemon=wild_pokemon,
+        trainer_party=trainer_party,
+        battle_result=battle_result,
+        battle_session=battle_session,
+    )
+    trainer_party_service.update_after_battle.assert_not_awaited()
+    pokedex_service.update_after_battle.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_fight_updates_progression_and_persists_success_result(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(id=uuid4()))
+    battle_session = SimpleNamespace(
+        id=uuid4(),
+        status=BattleSessionStatusEnum.ACTIVE,
+        wild_pokemon_id=uuid4(),
+        trainer_active_owned_pokemon_id=uuid4(),
+    )
+    trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(id=uuid4()))
+    trainer_party_battle = SimpleNamespace(
+        trainer_party=trainer_party,
+        trainer_party_selected_move=SimpleNamespace(
+            pokemon_move=SimpleNamespace(id=uuid4(), name="ember")
+        ),
+    )
+    wild_pokemon = SimpleNamespace(id=battle_session.wild_pokemon_id)
+    updated_trainer_party = SimpleNamespace(owned_pokemon=SimpleNamespace(id=uuid4()))
+    updated_wild_pokemon = SimpleNamespace(id=uuid4())
+    battle_result = SimpleNamespace(
+        error=False,
+        status=BattleSessionStatusEnum.ACTIVE,
+        owned_pokemon_progression=SimpleNamespace(),
+        wild_pokemon_progression=SimpleNamespace(),
+    )
+    persisted = SimpleNamespace(id=uuid4())
+
+    battle_service = AsyncMock()
+    battle_service.get = AsyncMock(return_value=battle_session)
+    battle_service.persist = AsyncMock(return_value=persisted)
+
+    trainer_party_service = AsyncMock()
+    trainer_party_service.preparation_for_battle = AsyncMock(
+        return_value=trainer_party_battle
+    )
+    trainer_party_service.update_after_battle = AsyncMock(
+        return_value=updated_trainer_party
+    )
+
+    pokedex_service = AsyncMock()
+    pokedex_service.find_one_cached = AsyncMock(return_value=wild_pokemon)
+    pokedex_service.update_after_battle = AsyncMock(return_value=updated_wild_pokemon)
+
+    service = _build_service_for_fight(
+        trainer_session,
+        battle_service=battle_service,
+        trainer_party_service=trainer_party_service,
+        pokedex_service=pokedex_service,
+    )
+    user = SimpleNamespace(
+        id=uuid4(),
+        username="ash",
+        trainer=trainer,
+        role=RoleEnum.USER,
+    )
+
+    with patch("app.domain.trainer.service.process_battle", return_value=battle_result):
+        result = await service.fight(
+            current_user=user,
+            payload=FightPayloadSchema(
+                battle_id=str(battle_session.id),
+                owned_pokemon_move_id="move-id",
+            ),
+        )
+
+    assert result is persisted
+    trainer_party_service.update_after_battle.assert_awaited_once_with(
+        trainer=trainer,
+        trainer_party=trainer_party,
+        selected_pokemon_progression=battle_result.owned_pokemon_progression,
+    )
+    pokedex_service.update_after_battle.assert_awaited_once_with(
+        trainer=trainer,
+        pokedex_entry=wild_pokemon,
+        pokedex_entry_progression=battle_result.wild_pokemon_progression,
+    )
+    battle_service.persist.assert_awaited_once_with(
+        wild_pokemon=updated_wild_pokemon,
+        trainer_party=updated_trainer_party,
+        battle_result=battle_result,
+        battle_session=battle_session,
+    )

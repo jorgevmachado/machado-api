@@ -44,12 +44,28 @@ class BattleLogService(BaseService[BattleLogRepository, BattleLog]):
         payload: dict,
         battle_session_id: UUID,
     ) -> BattleLog:
+        return await self.create(
+            actor=BattleActorEnum.TRAINER,
+            payload=payload,
+            message=f"Wild {payload['pokemon_name']} battle started",
+            log_type=BattleLogTypeEnum.SESSION_STARTED,
+            battle_session_id=battle_session_id,
+        )
+
+    async def create(
+        self,
+        actor: BattleActorEnum,
+        payload: dict,
+        message: str,
+        log_type: BattleLogTypeEnum,
+        battle_session_id: UUID,
+    ) -> BattleLog:
         return await self.repository.save(
             entity=BattleLog(
-                message=f"Wild {payload['pokemon_name']} battle started",
-                log_type=BattleLogTypeEnum.SESSION_STARTED,
-                actor=BattleActorEnum.TRAINER,
+                actor=actor,
                 payload=payload,
+                message=message,
+                log_type=log_type,
                 battle_session_id=battle_session_id,
             )
         )

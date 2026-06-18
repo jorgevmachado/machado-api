@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
+
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LoggingParams
@@ -9,10 +12,12 @@ from app.domain.trainer.battle.battle_log.service import BattleLogService
 from app.domain.trainer.battle.business import (
     build_trainer_party_snapshot,
     build_wild_pokemon_snapshot,
+    build_payload,
 )
 from app.domain.trainer.battle.repository import BattleRepository
 from app.domain.trainer.battle.schema import (
     BattleSchema,
+    BattleProcessedSchema,
 )
 from app.domain.trainer.pokedex.service import PokedexService
 from app.domain.trainer.trainer_log.service import TrainerLogService
@@ -21,8 +26,17 @@ from app.models import (
     ExplorationEvent,
     Trainer,
     TrainerParty,
+    PokedexEntry,
+    utcnow,
 )
-from app.models.enums import BattleSessionStatusEnum
+from app.models.enums import (
+    BattleSessionStatusEnum,
+    LogStatusEnum,
+    TrainerLogEventEnum,
+    LogTypeEnum,
+    BattleActorEnum,
+    BattleLogTypeEnum,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +94,17 @@ class BattleService(BaseService[BattleRepository, BattleSession]):
 
         wild_pokemon_snapshot = build_wild_pokemon_snapshot(wild_pokemon)
 
+        payload = build_payload(
+            message="Battle session started",
+            wild_pokemon=wild_pokemon,
+            trainer_active_pokemon=party.owned_pokemon,
+        )
+
         entity = await self.repository.save(
             entity=BattleSession(
                 status=BattleSessionStatusEnum.ACTIVE,
                 trainer_id=trainer.id,
                 wild_pokemon_id=wild_pokemon.id,
-                wild_pokemon_name=wild_pokemon.name,
-                wild_pokemon_level=wild_pokemon.level,
                 exploration_event_id=exploration_event.id,
                 wild_pokemon_snapshot=wild_pokemon_snapshot,
                 trainer_party_snapshot=trainer_party_snapshot,
@@ -98,10 +116,103 @@ class BattleService(BaseService[BattleRepository, BattleSession]):
         await self.battle_log_service.start(
             battle_session_id=entity.id,
             payload={
-                "pokemon_name": wild_pokemon.name,
+                **(payload or {}),
                 "exploration_event_id": str(exploration_event.id),
-                "trainer_active_owned_pokemon_id": str(party.owned_pokemon.id),
             },
         )
 
         return entity
+
+    async def get(
+        self,
+        trainer: Trainer,
+        status: BattleSessionStatusEnum = BattleSessionStatusEnum.ACTIVE,
+        battle_id: str | None = None,
+    ) -> BattleSession:
+        if battle_id:
+            battle_session = await self.find_one(param=battle_id, trainer_id=trainer.id)
+        else:
+            battle_session = await self.find_by(
+                status=status,
+                trainer_id=trainer.id,
+                without_throw=True,
+            )
+
+        if not battle_session:
+            message = "Trainer has no active battle"
+            await self.trainer_log.create(
+                status=LogStatusEnum.ERROR,
+                event=TrainerLogEventEnum.BATTLE,
+                user_id=trainer.user.id,
+                message=message,
+                payload={
+                    "battle_session_id": battle_id,
+                    "battle_session_status": status,
+                },
+                log_type=LogTypeEnum.TRAINER,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail=message,
+            )
+        if battle_session.status != BattleSessionStatusEnum.ACTIVE:
+            message = f"Battle session finish with {battle_session.status.value} status"
+            await self.trainer_log.create(
+                status=LogStatusEnum.ERROR,
+                event=TrainerLogEventEnum.BATTLE,
+                user_id=trainer.user.id,
+                message=message,
+                payload={
+                    "battle_session_id": battle_id,
+                    "battle_session_status": battle_session.status,
+                },
+                log_type=LogTypeEnum.TRAINER,
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=message,
+            )
+
+        return battle_session
+
+    async def persist(
+        self,
+        wild_pokemon: PokedexEntry,
+        trainer_party: TrainerParty,
+        battle_session: BattleSession,
+        battle_result: BattleProcessedSchema,
+        persist_type: BattleLogTypeEnum = BattleLogTypeEnum.MOVE_USED,
+    ) -> BattleSession:
+
+        battle_session.status = battle_result.status
+
+        payload = build_payload(
+            wild_pokemon=wild_pokemon,
+            battle_result=battle_result,
+            trainer_active_pokemon=trainer_party.owned_pokemon,
+        )
+
+        battle_session.wild_pokemon_snapshot = build_wild_pokemon_snapshot(wild_pokemon)
+        battle_session.trainer_party_snapshot = build_trainer_party_snapshot(
+            trainer_party
+        )
+
+        battle_session.trainer_active_owned_pokemon_id = trainer_party.owned_pokemon.id
+
+        if not battle_result.error:
+            battle_session.turn_number += 1
+        battle_session.updated_at = utcnow()
+        updated_battle_session = await self.repository.update(entity=battle_session)
+
+        await self.battle_log_service.create(
+            actor=BattleActorEnum.TRAINER,
+            payload={
+                **(payload or {}),
+                "exploration_event_id": str(battle_session.exploration_event_id),
+            },
+            message=payload["message"],
+            log_type=persist_type,
+            battle_session_id=updated_battle_session.id,
+        )
+
+        return updated_battle_session

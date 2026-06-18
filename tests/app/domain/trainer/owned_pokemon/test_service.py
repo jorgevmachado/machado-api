@@ -506,3 +506,77 @@ def test_init_builds_default_dependencies_from_session(
         pokemon_from_session.assert_called_once_with(trainer_session)
         move_from_session.assert_called_once_with(trainer_session)
         log_from_session.assert_called_once_with(trainer_session)
+
+
+@pytest.mark.asyncio
+async def test_select_move_to_battle_raises_when_move_not_found() -> None:
+    trainer = _build_trainer()
+    move_service = AsyncMock()
+    move_service.find_by = AsyncMock(return_value=None)
+    service = OwnedPokemonService(
+        repository=_build_repository(AsyncMock()),
+        pokemon_service=AsyncMock(),
+        owned_pokemon_move_service=move_service,
+        trainer_log=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException, match="not found"):
+        await service.select_move_to_battle(
+            trainer=trainer,
+            owned_pokemon_id=uuid4(),
+            owned_pokemon_move_id="missing-move",
+        )
+
+
+@pytest.mark.asyncio
+async def test_select_move_to_battle_raises_when_move_has_no_pp() -> None:
+    trainer = _build_trainer()
+    move = SimpleNamespace(
+        id=uuid4(),
+        pp=0,
+        owned_pokemon=SimpleNamespace(name="bulbasaur"),
+    )
+    move_service = AsyncMock()
+    move_service.find_by = AsyncMock(return_value=move)
+    service = OwnedPokemonService(
+        repository=_build_repository(AsyncMock()),
+        pokemon_service=AsyncMock(),
+        owned_pokemon_move_service=move_service,
+        trainer_log=AsyncMock(),
+    )
+
+    with pytest.raises(HTTPException, match="no PP"):
+        await service.select_move_to_battle(
+            trainer=trainer,
+            owned_pokemon_id=uuid4(),
+            owned_pokemon_move_id=str(move.id),
+        )
+
+
+@pytest.mark.asyncio
+async def test_select_move_to_battle_decrements_pp_and_updates_entity() -> None:
+    trainer = _build_trainer()
+    move = SimpleNamespace(
+        id=uuid4(),
+        pp=10,
+        owned_pokemon=SimpleNamespace(name="bulbasaur"),
+    )
+    move_service = AsyncMock()
+    move_service.find_by = AsyncMock(return_value=move)
+    move_service.update_entity = AsyncMock()
+    service = OwnedPokemonService(
+        repository=_build_repository(AsyncMock()),
+        pokemon_service=AsyncMock(),
+        owned_pokemon_move_service=move_service,
+        trainer_log=AsyncMock(),
+    )
+
+    result = await service.select_move_to_battle(
+        trainer=trainer,
+        owned_pokemon_id=uuid4(),
+        owned_pokemon_move_id=str(move.id),
+    )
+
+    assert result is move
+    assert move.pp == 9
+    move_service.update_entity.assert_awaited_once_with(entity=move)

@@ -11,8 +11,8 @@ from app.core.exceptions import handle_service_exception
 from app.core.logging import LoggingParams
 from app.core.service import BaseService
 from app.domain.pokemon.service import PokemonService
+from app.domain.trainer.battle.business import process_battle
 from app.domain.trainer.battle.service import BattleService
-from app.domain.trainer.battle.repository import BattleRepository
 from app.domain.trainer.business import (
     DEFAULT_TRAINER_CAPTURE_RATE,
     DEFAULT_TRAINER_POKEBALLS,
@@ -28,6 +28,7 @@ from app.domain.trainer.schema import (
     OnboardPayloadSchema,
     TrainerSchema,
     CapturePayloadSchema,
+    FightPayloadSchema,
 )
 from app.domain.trainer.trainer_log.service import TrainerLogService
 from app.models import (
@@ -39,6 +40,7 @@ from app.models import (
     LogTypeEnum,
     PokemonStatusEnum,
     ExplorationEvent,
+    BattleSession,
 )
 from app.models.enums import ExplorationEventTypeEnum, BattleSessionStatusEnum
 
@@ -80,11 +82,7 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
             trainer_encounter_service or TrainerEncounterService.from_session(session)
         )
         self.trainer_log = trainer_log or TrainerLogService.from_session(session)
-        self.battle_service = battle_service or BattleService(
-            repository=BattleRepository(session),
-            trainer_log=self.trainer_log,
-            pokedex_service=self.pokedex_service,
-        )
+        self.battle_service = battle_service or BattleService.from_session(session)
         self.exploration_service = (
             exploration_service or ExplorationService.from_session(session)
         )
@@ -232,19 +230,10 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
     async def capture(
         self, current_user: User, payload: CapturePayloadSchema
     ) -> Trainer | None:
-        trainer = current_user.trainer
-        if not trainer:
-            await self.trainer_log.create(
-                status=LogStatusEnum.ERROR,
-                event=TrainerLogEventEnum.CAPTURED,
-                user_id=current_user.id,
-                message="User must be onboarded to capture a pokemon",
-                log_type=LogTypeEnum.TRAINER,
-            )
-            raise HTTPException(
-                detail="User must be onboarded to capture a pokemon",
-                status_code=HTTPStatus.BAD_REQUEST,
-            )
+        trainer = await self._validate_trainer(
+            user=current_user,
+            message="User must be onboarded to capture a pokemon",
+        )
         if trainer.pokeballs <= 0:
             await self.trainer_log.create(
                 event=TrainerLogEventEnum.CAPTURED,
@@ -300,19 +289,10 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         return await self.repository.find_by(id=trainer.id)
 
     async def explore(self, current_user: User) -> ExplorationEvent:
-        trainer = current_user.trainer
-        if not trainer:
-            await self.trainer_log.create(
-                status=LogStatusEnum.ERROR,
-                event=TrainerLogEventEnum.EXPLORED,
-                user_id=current_user.id,
-                message="User must be onboarded to explore a pokemon word",
-                log_type=LogTypeEnum.TRAINER,
-            )
-            raise HTTPException(
-                detail="User must be onboarded to explore a pokemon word",
-                status_code=HTTPStatus.BAD_REQUEST,
-            )
+        trainer = await self._validate_trainer(
+            user=current_user,
+            message="User must be onboarded to explore a pokemon word",
+        )
 
         active_battle = await self.battle_service.find_by(
             status=BattleSessionStatusEnum.ACTIVE,
@@ -391,3 +371,85 @@ class TrainerService(BaseService[TrainerRepository, Trainer]):
         )
         await self.cache_service.delete_domain()
         return exploration_result
+
+    async def fight(
+        self, current_user: User, payload: FightPayloadSchema
+    ) -> BattleSession:
+        trainer = await self._validate_trainer(
+            user=current_user, message="User must be onboarded to fight"
+        )
+
+        battle_session = await self.battle_service.get(
+            trainer=trainer,
+            battle_id=payload.battle_id,
+        )
+
+        owned_pokemon_move_id = payload.owned_pokemon_move_id
+
+        pokedex_entry = await self.pokedex_service.find_one_cached(
+            param=str(battle_session.wild_pokemon_id),
+            trainer_id=trainer.id,
+            user_request=current_user.username,
+            clean_cache=True,
+        )
+
+        trainer_party_battle = await self.trainer_party_service.preparation_for_battle(
+            trainer=trainer,
+            owned_pokemon_id=battle_session.trainer_active_owned_pokemon_id,
+            owned_pokemon_move_id=owned_pokemon_move_id,
+        )
+
+        trainer_party = trainer_party_battle.trainer_party
+        trainer_party_selected_move = trainer_party_battle.trainer_party_selected_move
+
+        battle_result = process_battle(
+            move=trainer_party_selected_move.pokemon_move,
+            status=battle_session.status,
+            wild_pokemon=pokedex_entry,
+            trainer_party=trainer_party,
+        )
+
+        if battle_result.error:
+            return await self.battle_service.persist(
+                wild_pokemon=pokedex_entry,
+                trainer_party=trainer_party,
+                battle_result=battle_result,
+                battle_session=battle_session,
+            )
+
+        updated_trainer_party = await self.trainer_party_service.update_after_battle(
+            trainer=trainer,
+            trainer_party=trainer_party,
+            selected_pokemon_progression=battle_result.owned_pokemon_progression,
+        )
+
+        updated_wild_pokemon = await self.pokedex_service.update_after_battle(
+            trainer=trainer,
+            pokedex_entry=pokedex_entry,
+            pokedex_entry_progression=battle_result.wild_pokemon_progression,
+        )
+
+        return await self.battle_service.persist(
+            wild_pokemon=updated_wild_pokemon,
+            trainer_party=updated_trainer_party,
+            battle_result=battle_result,
+            battle_session=battle_session,
+        )
+
+    async def _validate_trainer(
+        self, user: User, message: str = "Trainer Not Found"
+    ) -> Trainer:
+        trainer = user.trainer
+        if not trainer:
+            await self.trainer_log.create(
+                status=LogStatusEnum.ERROR,
+                event=TrainerLogEventEnum.EXPLORED,
+                user_id=user.id,
+                message=message,
+                log_type=LogTypeEnum.TRAINER,
+            )
+            raise HTTPException(
+                detail=message,
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+        return trainer

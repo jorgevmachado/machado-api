@@ -85,10 +85,9 @@ def upgrade() -> None:
         "battle_sessions",
         sa.Column("trainer_id", sa.Uuid(), nullable=False),
         sa.Column("exploration_event_id", sa.Uuid(), nullable=False),
+        sa.Column("payload", sa.JSON(), nullable=False),
         sa.Column("wild_pokemon_id", sa.Uuid(), nullable=False),
         sa.Column("trainer_active_owned_pokemon_id", sa.Uuid(), nullable=True),
-        sa.Column("wild_pokemon_name", sa.String(), nullable=False),
-        sa.Column("wild_pokemon_level", sa.Integer(), nullable=False),
         sa.Column("turn_number", sa.Integer(), nullable=False),
         sa.Column(
             "status",

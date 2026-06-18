@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.domain.trainer.pokedex.service import PokedexService
+from app.domain.trainer.progression import AttributesCalculatedSchema
 from app.shared.schemas import FilterPage
 
 
@@ -343,3 +344,102 @@ async def test_discover_delegates_to_pokedex_entry_service(
         pokedex_id="pokedex-id",
         without_throw=True,
     )
+
+
+@pytest.mark.asyncio
+async def test_update_after_battle_returns_same_entry_when_no_changes(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(username="ash"))
+    entry = SimpleNamespace(
+        id=uuid4(),
+        hp=30,
+        level=5,
+        speed=10,
+        attack=10,
+        max_hp=40,
+        defense=10,
+        experience=100,
+        special_attack=10,
+        special_defense=10,
+    )
+    progression = AttributesCalculatedSchema(
+        hp=30,
+        level=5,
+        speed=10,
+        attack=10,
+        max_hp=40,
+        defense=10,
+        level_up=False,
+        experience=100,
+        special_attack=10,
+        special_defense=10,
+    )
+    entry_service = AsyncMock()
+    service = PokedexService(
+        repository=_build_repository(trainer_session),
+        pokemon_service=AsyncMock(),
+        pokedex_entry_service=entry_service,
+    )
+    service.find_one = AsyncMock()
+
+    result = await service.update_after_battle(
+        trainer=trainer,
+        pokedex_entry=entry,
+        pokedex_entry_progression=progression,
+    )
+
+    assert result is entry
+    entry_service.update_entity.assert_not_awaited()
+    service.find_one.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_after_battle_updates_and_reloads_entry(
+    trainer_session: AsyncMock,
+) -> None:
+    trainer = SimpleNamespace(id=uuid4(), user=SimpleNamespace(username="ash"))
+    entry = SimpleNamespace(
+        id=uuid4(),
+        hp=30,
+        level=5,
+        speed=10,
+        attack=10,
+        max_hp=40,
+        defense=10,
+        experience=100,
+        special_attack=10,
+        special_defense=10,
+    )
+    progression = AttributesCalculatedSchema(
+        hp=45,
+        level=6,
+        speed=20,
+        attack=21,
+        max_hp=50,
+        defense=22,
+        level_up=True,
+        experience=200,
+        special_attack=23,
+        special_defense=24,
+    )
+    entry_service = AsyncMock()
+    service = PokedexService(
+        repository=_build_repository(trainer_session),
+        pokemon_service=AsyncMock(),
+        pokedex_entry_service=entry_service,
+    )
+    reloaded = SimpleNamespace(id=entry.id)
+    service.find_one = AsyncMock(return_value=reloaded)
+
+    result = await service.update_after_battle(
+        trainer=trainer,
+        pokedex_entry=entry,
+        pokedex_entry_progression=progression,
+    )
+
+    assert result is reloaded
+    assert entry.hp == 45
+    assert entry.level == 6
+    assert entry.speed == 20
+    entry_service.update_entity.assert_awaited_once_with(entity=entry)

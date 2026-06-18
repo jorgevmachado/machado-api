@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, Enum as SAEnum, ForeignKey, Integer, String
+from sqlalchemy import JSON, DateTime, Enum as SAEnum, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import default_lazy, table_registry
@@ -38,8 +38,6 @@ class BattleSession:
         nullable=False,
     )
 
-    wild_pokemon_name: Mapped[str] = mapped_column(String, nullable=False)
-    wild_pokemon_level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     turn_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     status: Mapped[BattleSessionStatusEnum] = mapped_column(
@@ -47,10 +45,15 @@ class BattleSession:
         nullable=False,
         default=BattleSessionStatusEnum.ACTIVE,
     )
-    trainer_party_snapshot: Mapped[list[dict[str, Any]]] = mapped_column(
+
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default_factory=dict
+    )
+
+    trainer_party_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSON,
         nullable=False,
-        default_factory=list,
+        default_factory=dict,
     )
     wild_pokemon_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSON,

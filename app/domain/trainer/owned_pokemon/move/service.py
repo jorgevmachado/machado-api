@@ -18,7 +18,9 @@ from app.models import Move, OwnedPokemonMove
 logger = logging.getLogger(__name__)
 
 
-class OwnedPokemonMoveService(BaseService[OwnedPokemonMoveRepository, Move]):
+class OwnedPokemonMoveService(
+    BaseService[OwnedPokemonMoveRepository, OwnedPokemonMove]
+):
     def __init__(
         self,
         repository: OwnedPokemonMoveRepository,
